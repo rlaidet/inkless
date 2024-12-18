@@ -34,6 +34,7 @@ import org.apache.kafka.streams.processor.api.MockProcessorContext;
 import org.apache.kafka.streams.processor.api.Processor;
 import org.apache.kafka.streams.processor.api.Record;
 import org.apache.kafka.streams.processor.internals.ProcessorNode;
+import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.internals.InMemoryTimeOrderedKeyValueChangeBuffer;
 import org.apache.kafka.test.MockInternalProcessorContext;
 
@@ -42,6 +43,7 @@ import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
@@ -91,7 +93,7 @@ public class KTableSuppressProcessorTest {
             @SuppressWarnings("unchecked")
             final KTableImpl<K, ?, V> parent = mock(KTableImpl.class);
             final Processor<K, Change<V>, K, Change<V>> processor =
-                new KTableSuppressProcessorSupplier<>((SuppressedInternal<K>) suppressed, storeName, parent).get();
+                new KTableSuppressProcessorSupplier<>((SuppressedInternal<K>) suppressed, mockBuilderWithName(storeName), parent).get();
 
             final MockInternalProcessorContext<K, Change<V>> context = new MockInternalProcessorContext<>();
             context.setCurrentNode(new ProcessorNode<>("testNode"));
@@ -486,5 +488,11 @@ public class KTableSuppressProcessorTest {
             new TimeWindowedSerializer<>(kSerde.serializer()),
             new TimeWindowedDeserializer<>(kSerde.deserializer(), windowSize)
         );
+    }
+
+    private static StoreBuilder<?> mockBuilderWithName(final String name) {
+        final StoreBuilder<?> builder = Mockito.mock(StoreBuilder.class);
+        Mockito.when(builder.name()).thenReturn(name);
+        return builder;
     }
 }
