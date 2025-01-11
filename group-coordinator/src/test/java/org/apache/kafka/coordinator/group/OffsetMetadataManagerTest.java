@@ -62,7 +62,6 @@ import org.apache.kafka.coordinator.group.modern.consumer.ConsumerGroup;
 import org.apache.kafka.coordinator.group.modern.consumer.ConsumerGroupMember;
 import org.apache.kafka.image.MetadataImage;
 import org.apache.kafka.server.common.ApiMessageAndVersion;
-import org.apache.kafka.server.common.MetadataVersion;
 import org.apache.kafka.timeline.SnapshotRegistry;
 
 import org.junit.jupiter.api.Test;
@@ -449,8 +448,7 @@ public class OffsetMetadataManagerTest {
                     "metadata",
                     commitTimestamp,
                     OptionalLong.empty()
-                ),
-                MetadataVersion.latestTesting()
+                )
             ));
         }
 
@@ -907,8 +905,7 @@ public class OffsetMetadataManagerTest {
                     "",
                     context.time.milliseconds(),
                     OptionalLong.of(context.time.milliseconds() + 1234L)
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -1015,8 +1012,7 @@ public class OffsetMetadataManagerTest {
                     "",
                     context.time.milliseconds(),
                     OptionalLong.empty()
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -1075,8 +1071,7 @@ public class OffsetMetadataManagerTest {
                     "",
                     context.time.milliseconds(),
                     OptionalLong.empty()
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -1239,8 +1234,7 @@ public class OffsetMetadataManagerTest {
                     "",
                     context.time.milliseconds(),
                     OptionalLong.empty()
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -1306,8 +1300,7 @@ public class OffsetMetadataManagerTest {
                     "metadata",
                     context.time.milliseconds(),
                     OptionalLong.empty()
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -1383,8 +1376,7 @@ public class OffsetMetadataManagerTest {
                     "small",
                     context.time.milliseconds(),
                     OptionalLong.empty()
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -1450,8 +1442,7 @@ public class OffsetMetadataManagerTest {
                     "metadata",
                     context.time.milliseconds(),
                     OptionalLong.empty()
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -1608,8 +1599,7 @@ public class OffsetMetadataManagerTest {
                     "metadata",
                     context.time.milliseconds(),
                     OptionalLong.empty()
-                ),
-                MetadataImage.EMPTY.features().metadataVersion()
+                )
             )),
             result.records()
         );
@@ -3136,8 +3126,7 @@ public class OffsetMetadataManagerTest {
             groupId,
             topic,
             partition,
-            offsetAndMetadata,
-            MetadataImage.EMPTY.features().metadataVersion()
+            offsetAndMetadata
         ));
 
         assertEquals(offsetAndMetadata, context.offsetMetadataManager.offset(
@@ -3159,8 +3148,7 @@ public class OffsetMetadataManagerTest {
             groupId,
             topic,
             partition,
-            offsetAndMetadata,
-            MetadataImage.EMPTY.features().metadataVersion()
+            offsetAndMetadata
         ));
 
         assertEquals(offsetAndMetadata, context.offsetMetadataManager.pendingTransactionalOffset(
