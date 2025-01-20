@@ -19,9 +19,10 @@ package kafka.server
 
 import kafka.server.metadata.KRaftMetadataCache
 import org.apache.kafka.admin.BrokerMetadata
-import org.apache.kafka.common.message.{MetadataResponseData, UpdateMetadataRequestData}
+import org.apache.kafka.common.message.MetadataResponseData
 import org.apache.kafka.common.network.ListenerName
 import org.apache.kafka.common.{Cluster, Node, TopicPartition, Uuid}
+import org.apache.kafka.metadata.LeaderAndIsr
 import org.apache.kafka.server.common.{FinalizedFeatures, KRaftVersion, MetadataVersion}
 
 import java.util
@@ -76,7 +77,7 @@ trait MetadataCache {
 
   def getBrokerNodes(listenerName: ListenerName): Iterable[Node]
 
-  def getPartitionInfo(topic: String, partitionId: Int): Option[UpdateMetadataRequestData.UpdateMetadataPartitionState]
+  def getLeaderAndIsr(topic: String, partitionId: Int): Option[LeaderAndIsr]
 
   /**
    * Return the number of partitions in the given topic, or None if the given topic does not exist.

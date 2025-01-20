@@ -1355,7 +1355,7 @@ class KRaftClusterTest {
         // Shut down broker0 and wait until the ISR of foo-0 is set to [1, 2]
         broker0.shutdown()
         TestUtils.retry(60000) {
-          val info = broker1.metadataCache.getPartitionInfo("foo", 0)
+          val info = broker1.metadataCache.getLeaderAndIsr("foo", 0)
           assertTrue(info.isDefined)
           assertEquals(Set(1, 2), info.get.isr().asScala.toSet)
         }
@@ -1369,7 +1369,7 @@ class KRaftClusterTest {
         // Start up broker0 and wait until the ISR of foo-0 is set to [0, 1, 2]
         broker0.startup()
         TestUtils.retry(60000) {
-          val info = broker1.metadataCache.getPartitionInfo("foo", 0)
+          val info = broker1.metadataCache.getLeaderAndIsr("foo", 0)
           assertTrue(info.isDefined)
           assertEquals(Set(0, 1, 2), info.get.isr().asScala.toSet)
         }
@@ -1410,7 +1410,7 @@ class KRaftClusterTest {
         // Shut down broker0 and wait until the ISR of foo-0 is set to [1, 2]
         broker0.shutdown()
         TestUtils.retry(60000) {
-          val info = broker1.metadataCache.getPartitionInfo("foo", 0)
+          val info = broker1.metadataCache.getLeaderAndIsr("foo", 0)
           assertTrue(info.isDefined)
           assertEquals(Set(1, 2), info.get.isr().asScala.toSet)
         }
@@ -1424,7 +1424,7 @@ class KRaftClusterTest {
         // Start up broker0 and wait until the ISR of foo-0 is set to [0, 1, 2]
         broker0.startup()
         TestUtils.retry(60000) {
-          val info = broker1.metadataCache.getPartitionInfo("foo", 0)
+          val info = broker1.metadataCache.getLeaderAndIsr("foo", 0)
           assertTrue(info.isDefined)
           assertEquals(Set(0, 1, 2), info.get.isr().asScala.toSet)
           assertTrue(broker0.logManager.getLog(foo0, isFuture = true).isEmpty)
@@ -1475,7 +1475,7 @@ class KRaftClusterTest {
         // Shut down broker0 and wait until the ISR of foo-0 is set to [1, 2]
         broker0.shutdown()
         TestUtils.retry(60000) {
-          val info = broker1.metadataCache.getPartitionInfo("foo", 0)
+          val info = broker1.metadataCache.getLeaderAndIsr("foo", 0)
           assertTrue(info.isDefined)
           assertEquals(Set(1, 2), info.get.isr().asScala.toSet)
         }
@@ -1501,7 +1501,7 @@ class KRaftClusterTest {
         // Start up broker0 and wait until the ISR of foo-0 is set to [0, 1, 2]
         broker0.startup()
         TestUtils.retry(60000) {
-          val info = broker1.metadataCache.getPartitionInfo("foo", 0)
+          val info = broker1.metadataCache.getLeaderAndIsr("foo", 0)
           assertTrue(info.isDefined)
           assertEquals(Set(0, 1, 2), info.get.isr().asScala.toSet)
           assertTrue(broker0.logManager.getLog(foo0, isFuture = true).isEmpty)
