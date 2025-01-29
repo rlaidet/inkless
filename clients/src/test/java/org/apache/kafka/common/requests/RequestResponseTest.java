@@ -2012,7 +2012,8 @@ public class RequestResponseTest {
                         .setPartitionIndex(1)
                         .setHighWatermark(1000000)
                         .setLogStartOffset(0)
-                        .setAbortedTransactions(abortedTransactions));
+                        .setAbortedTransactions(abortedTransactions)
+                        .setRecords(MemoryRecords.EMPTY));
         return FetchResponse.parse(FetchResponse.of(Errors.NONE, 25, sessionId,
             responseData).serialize(FETCH.latestVersion()), FETCH.latestVersion());
     }
@@ -2036,7 +2037,8 @@ public class RequestResponseTest {
                         .setPartitionIndex(1)
                         .setHighWatermark(1000000)
                         .setLogStartOffset(0)
-                        .setAbortedTransactions(abortedTransactions));
+                        .setAbortedTransactions(abortedTransactions)
+                        .setRecords(MemoryRecords.EMPTY));
         return FetchResponse.parse(FetchResponse.of(Errors.NONE, 25, INVALID_SESSION_ID,
             responseData).serialize(FETCH.latestVersion()), FETCH.latestVersion());
     }
