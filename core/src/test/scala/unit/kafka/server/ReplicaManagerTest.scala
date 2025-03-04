@@ -6231,7 +6231,7 @@ class ReplicaManagerTest {
     }
 
     private def createReplicaManager(): ReplicaManager = {
-      val props = TestUtils.createBrokerConfig(1, TestUtils.MockZkConnect, logDirCount = 2)
+      val props = TestUtils.createBrokerConfig(1, logDirCount = 2)
       val config = KafkaConfig.fromProps(props)
       val logManagerMock = mock(classOf[LogManager])
       when(logManagerMock.liveLogDirs).thenReturn(Seq.empty)
@@ -6252,7 +6252,6 @@ class ReplicaManagerTest {
         logDirFailureChannel = logDirFailureChannel,
         alterPartitionManager = alterPartitionManager,
         threadNamePrefix = Option(this.getClass.getName),
-        zkClient = None,
         inklessSharedState = Some(sharedState),
       )
     }

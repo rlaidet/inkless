@@ -1,3 +1,6 @@
+.PHONY: all
+all: clean fmt test pitest
+
 .PHONY: local_minio
 local_minio:
 	docker compose up -d minio minio-create_bucket

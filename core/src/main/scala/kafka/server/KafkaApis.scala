@@ -107,7 +107,7 @@ class KafkaApis(val requestChannel: RequestChannel,
                 val apiVersionManager: ApiVersionManager,
                 val clientMetricsManager: ClientMetricsManager,
                 inklessSharedState: Option[SharedState] = None
-               ) extends ApiRequestHandler with Logging {
+) extends ApiRequestHandler with Logging {
 
   type FetchResponseStats = Map[TopicPartition, RecordValidationStats]
   this.logIdent = "[KafkaApi-%d] ".format(brokerId)
