@@ -23,6 +23,7 @@ import org.apache.kafka.clients.MockClient;
 import org.apache.kafka.clients.NetworkClient;
 import org.apache.kafka.clients.NodeApiVersions;
 import org.apache.kafka.clients.consumer.internals.AsyncKafkaConsumer;
+import org.apache.kafka.clients.consumer.internals.AutoOffsetResetStrategy;
 import org.apache.kafka.clients.consumer.internals.ClassicKafkaConsumer;
 import org.apache.kafka.clients.consumer.internals.ConsumerMetadata;
 import org.apache.kafka.clients.consumer.internals.ConsumerProtocol;
@@ -65,6 +66,8 @@ import org.apache.kafka.common.metrics.KafkaMetric;
 import org.apache.kafka.common.metrics.Measurable;
 import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.metrics.Metrics;
+import org.apache.kafka.common.metrics.Monitorable;
+import org.apache.kafka.common.metrics.PluginMetrics;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.network.Selectable;
@@ -100,10 +103,11 @@ import org.apache.kafka.common.utils.MockTime;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.apache.kafka.test.MockConsumerInterceptor;
+import org.apache.kafka.test.MockDeserializer;
 import org.apache.kafka.test.MockMetricsReporter;
 import org.apache.kafka.test.TestUtils;
 
-import org.apache.log4j.Level;
+import org.apache.logging.log4j.Level;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -224,7 +228,7 @@ public class KafkaConsumerTest {
 
     private final Collection<TopicPartition> singleTopicPartition = Collections.singleton(new TopicPartition(topic, 0));
     private final Time time = new MockTime();
-    private final SubscriptionState subscription = new SubscriptionState(new LogContext(), OffsetResetStrategy.EARLIEST);
+    private final SubscriptionState subscription = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.EARLIEST);
     private final ConsumerPartitionAssignor assignor = new RoundRobinAssignor();
 
     private KafkaConsumer<?, ?> consumer;
@@ -1029,7 +1033,7 @@ public class KafkaConsumerTest {
     @ParameterizedTest
     @EnumSource(value = GroupProtocol.class)
     public void testMissingOffsetNoResetPolicy(GroupProtocol groupProtocol) throws InterruptedException {
-        SubscriptionState subscription = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscription = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         ConsumerMetadata metadata = createMetadata(subscription);
         MockClient client = new MockClient(time, metadata);
 
@@ -1058,7 +1062,7 @@ public class KafkaConsumerTest {
     @ParameterizedTest
     @EnumSource(GroupProtocol.class)
     public void testResetToCommittedOffset(GroupProtocol groupProtocol) {
-        SubscriptionState subscription = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscription = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         ConsumerMetadata metadata = createMetadata(subscription);
         MockClient client = new MockClient(time, metadata);
 
@@ -1081,7 +1085,20 @@ public class KafkaConsumerTest {
     @ParameterizedTest
     @EnumSource(GroupProtocol.class)
     public void testResetUsingAutoResetPolicy(GroupProtocol groupProtocol) {
-        SubscriptionState subscription = new SubscriptionState(new LogContext(), OffsetResetStrategy.LATEST);
+        setUpConsumerWithAutoResetPolicy(groupProtocol, AutoOffsetResetStrategy.LATEST);
+        assertEquals(50L, consumer.position(tp0));
+    }
+
+    @ParameterizedTest
+    @EnumSource(GroupProtocol.class)
+    public void testResetUsingDurationBasedAutoResetPolicy(GroupProtocol groupProtocol) {
+        AutoOffsetResetStrategy durationStrategy = AutoOffsetResetStrategy.fromString("by_duration:PT1H");
+        setUpConsumerWithAutoResetPolicy(groupProtocol, durationStrategy);
+        assertEquals(50L, consumer.position(tp0));
+    }
+
+    private void setUpConsumerWithAutoResetPolicy(GroupProtocol groupProtocol, AutoOffsetResetStrategy strategy) {
+        SubscriptionState subscription = new SubscriptionState(new LogContext(), strategy);
         ConsumerMetadata metadata = createMetadata(subscription);
         MockClient client = new MockClient(time, metadata);
 
@@ -1099,14 +1116,12 @@ public class KafkaConsumerTest {
         client.prepareResponse(listOffsetsResponse(Collections.singletonMap(tp0, 50L)));
 
         consumer.poll(Duration.ZERO);
-
-        assertEquals(50L, consumer.position(tp0));
     }
 
     @ParameterizedTest
     @EnumSource(GroupProtocol.class)
     public void testOffsetIsValidAfterSeek(GroupProtocol groupProtocol) {
-        SubscriptionState subscription = new SubscriptionState(new LogContext(), OffsetResetStrategy.LATEST);
+        SubscriptionState subscription = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.LATEST);
         ConsumerMetadata metadata = createMetadata(subscription);
         MockClient client = new MockClient(time, metadata);
 
@@ -2227,7 +2242,7 @@ public class KafkaConsumerTest {
             // by the background thread, so it can realize there is authentication fail  and then
             // throw the AuthenticationException
             assertPollEventuallyThrows(consumer, AuthenticationException.class,
-                    "he consumer was not able to discover metadata errors during continuous polling.");
+                    "this consumer was not able to discover metadata errors during continuous polling.");
         } else {
             assertThrows(AuthenticationException.class, () -> consumer.poll(Duration.ZERO));
         }
@@ -2283,7 +2298,7 @@ public class KafkaConsumerTest {
     public void testMeasureCommitSyncDuration(GroupProtocol groupProtocol) {
         Time time = new MockTime(Duration.ofSeconds(1).toMillis());
         SubscriptionState subscription = new SubscriptionState(new LogContext(),
-            OffsetResetStrategy.EARLIEST);
+            AutoOffsetResetStrategy.EARLIEST);
         ConsumerMetadata metadata = createMetadata(subscription);
         MockClient client = new MockClient(time, metadata);
         initMetadata(client, Collections.singletonMap(topic, 2));
@@ -2329,7 +2344,7 @@ public class KafkaConsumerTest {
         long offset1 = 10000;
         Time time = new MockTime(Duration.ofSeconds(1).toMillis());
         SubscriptionState subscription = new SubscriptionState(new LogContext(),
-            OffsetResetStrategy.EARLIEST);
+            AutoOffsetResetStrategy.EARLIEST);
         ConsumerMetadata metadata = createMetadata(subscription);
         MockClient client = new MockClient(time, metadata);
         initMetadata(client, Collections.singletonMap(topic, 2));
@@ -3064,7 +3079,10 @@ public class KafkaConsumerTest {
         configs.put(ConsumerConfig.FETCH_MIN_BYTES_CONFIG, minBytes);
         configs.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         configs.put(ConsumerConfig.GROUP_PROTOCOL_CONFIG, groupProtocol.name());
-        configs.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, heartbeatIntervalMs);
+        if (groupProtocol == GroupProtocol.CLASSIC) {
+            configs.put(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, heartbeatIntervalMs);
+            configs.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeoutMs);
+        }
         configs.put(ConsumerConfig.ISOLATION_LEVEL_CONFIG, IsolationLevel.READ_UNCOMMITTED.toString());
         configs.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         configs.put(ConsumerConfig.MAX_PARTITION_FETCH_BYTES_CONFIG, fetchSize);
@@ -3073,7 +3091,6 @@ public class KafkaConsumerTest {
         configs.put(ConsumerConfig.REQUEST_TIMEOUT_MS_CONFIG, requestTimeoutMs);
         configs.put(ConsumerConfig.RETRY_BACKOFF_MAX_MS_CONFIG, retryBackoffMaxMs);
         configs.put(ConsumerConfig.RETRY_BACKOFF_MS_CONFIG, retryBackoffMs);
-        configs.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeoutMs);
         configs.put(ConsumerConfig.THROW_ON_FETCH_STABLE_OFFSET_UNSUPPORTED, throwOnStableOffsetNotSupported);
         configs.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, valueDeserializer.getClass());
         groupInstanceId.ifPresent(gi -> configs.put(ConsumerConfig.GROUP_INSTANCE_ID_CONFIG, gi));
@@ -3669,6 +3686,84 @@ public void testClosingConsumerUnregistersConsumerMetrics(GroupProtocol groupPro
         @Override
         public void configure(Map<String, ?> configs) {
             CLIENT_IDS.add(configs.get(ConsumerConfig.CLIENT_ID_CONFIG).toString());
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = GroupProtocol.class)
+    void testMonitorablePlugins(GroupProtocol groupProtocol) {
+        try {
+            String clientId = "testMonitorablePlugins";
+            Map<String, Object> configs = new HashMap<>();
+            configs.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
+            configs.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9999");
+            configs.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, MonitorableDeserializer.class.getName());
+            configs.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, MonitorableDeserializer.class.getName());
+            configs.put(ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG, MonitorableInterceptor.class.getName());
+
+            KafkaConsumer<String, String> consumer = new KafkaConsumer<>(configs);
+            Map<MetricName, ? extends Metric> metrics = consumer.metrics();
+
+            MetricName expectedKeyDeserializerMetric = expectedMetricName(
+                    clientId,
+                    ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                    MonitorableDeserializer.class);
+            assertTrue(metrics.containsKey(expectedKeyDeserializerMetric));
+            assertEquals(VALUE, metrics.get(expectedKeyDeserializerMetric).metricValue());
+
+            MetricName expectedValueDeserializerMetric = expectedMetricName(
+                    clientId,
+                    ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                    MonitorableDeserializer.class);
+            assertTrue(metrics.containsKey(expectedValueDeserializerMetric));
+            assertEquals(VALUE, metrics.get(expectedValueDeserializerMetric).metricValue());
+
+            MetricName expectedInterceptorMetric = expectedMetricName(
+                    clientId,
+                    ConsumerConfig.INTERCEPTOR_CLASSES_CONFIG,
+                    MonitorableInterceptor.class);
+            assertTrue(metrics.containsKey(expectedInterceptorMetric));
+            assertEquals(VALUE, metrics.get(expectedInterceptorMetric).metricValue());
+
+            consumer.close(Duration.ZERO);
+            metrics = consumer.metrics();
+            assertFalse(metrics.containsKey(expectedKeyDeserializerMetric));
+            assertFalse(metrics.containsKey(expectedValueDeserializerMetric));
+            assertFalse(metrics.containsKey(expectedInterceptorMetric));
+        } finally {
+            MockConsumerInterceptor.resetCounters();
+        }
+    }
+
+    private MetricName expectedMetricName(String clientId, String config, Class<?> clazz) {
+        Map<String, String> expectedTags = new LinkedHashMap<>();
+        expectedTags.put("client-id", clientId);
+        expectedTags.put("config", config);
+        expectedTags.put("class", clazz.getSimpleName());
+        expectedTags.putAll(TAGS);
+        return new MetricName(NAME, "plugins", DESCRIPTION, expectedTags);
+    }
+
+    private static final String NAME = "name";
+    private static final String DESCRIPTION = "description";
+    private static final Map<String, String> TAGS = Collections.singletonMap("k", "v");
+    private static final double VALUE = 123.0;
+
+    public static class MonitorableDeserializer extends MockDeserializer implements Monitorable {
+
+        @Override
+        public void withPluginMetrics(PluginMetrics metrics) {
+            MetricName name = metrics.metricName(NAME, DESCRIPTION, TAGS);
+            metrics.addMetric(name, (Measurable) (config, now) -> VALUE);
+        }
+    }
+
+    public static class MonitorableInterceptor extends MockConsumerInterceptor implements Monitorable {
+
+        @Override
+        public void withPluginMetrics(PluginMetrics metrics) {
+            MetricName name = metrics.metricName(NAME, DESCRIPTION, TAGS);
+            metrics.addMetric(name, (Measurable) (config, now) -> VALUE);
         }
     }
 }

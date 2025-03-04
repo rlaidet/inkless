@@ -19,7 +19,6 @@ package org.apache.kafka.clients.consumer.internals;
 import org.apache.kafka.clients.consumer.AcknowledgementCommitCallback;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.clients.consumer.internals.events.ApplicationEventHandler;
 import org.apache.kafka.clients.consumer.internals.events.BackgroundEvent;
 import org.apache.kafka.clients.consumer.internals.events.CompletableEventReaper;
@@ -35,6 +34,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.InvalidGroupIdException;
 import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -54,12 +54,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
@@ -123,7 +125,7 @@ public class ShareConsumerImplTest {
                 new StringDeserializer(),
                 new StringDeserializer(),
                 time,
-                (a, b, c, d, e, f, g) -> applicationEventHandler,
+                (a, b, c, d, e, f, g, h) -> applicationEventHandler,
                 a -> backgroundEventReaper,
                 (a, b, c, d, e) -> fetchCollector,
                 backgroundEventQueue
@@ -169,7 +171,7 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testSuccessfulStartupShutdown() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         completeShareAcknowledgeOnCloseApplicationEventSuccessfully();
@@ -198,7 +200,7 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testWakeupBeforeCallingPoll() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         final String topicName = "foo";
@@ -216,7 +218,7 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testWakeupAfterEmptyFetch() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         final String topicName = "foo";
@@ -235,13 +237,13 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testWakeupAfterNonEmptyFetch() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         final String topicName = "foo";
         final int partition = 3;
         final TopicIdPartition tip = new TopicIdPartition(Uuid.randomUuid(), partition, topicName);
-        final ShareInFlightBatch<String, String> batch = new ShareInFlightBatch<>(tip);
+        final ShareInFlightBatch<String, String> batch = new ShareInFlightBatch<>(0, tip);
         batch.addRecord(new ConsumerRecord<>(topicName, partition, 2, "key1", "value1"));
         doAnswer(invocation -> {
             consumer.wakeup();
@@ -262,7 +264,7 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testFailOnClosedConsumer() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         completeShareAcknowledgeOnCloseApplicationEventSuccessfully();
@@ -273,8 +275,28 @@ public class ShareConsumerImplTest {
     }
 
     @Test
+    public void testUnsubscribeWithTopicAuthorizationException() {
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
+        consumer = newConsumer(subscriptions);
+
+        backgroundEventQueue.add(new ErrorEvent(new TopicAuthorizationException(Set.of("test-topic"))));
+        completeShareUnsubscribeApplicationEventSuccessfully(subscriptions);
+        assertDoesNotThrow(() -> consumer.unsubscribe());
+        assertDoesNotThrow(() -> consumer.close());
+    }
+
+    @Test
+    public void testCloseWithTopicAuthorizationException() {
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
+        consumer = newConsumer(subscriptions);
+
+        completeShareUnsubscribeApplicationEventSuccessfully(subscriptions);
+        assertDoesNotThrow(() -> consumer.close());
+    }
+
+    @Test
     public void testVerifyApplicationEventOnShutdown() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         completeShareAcknowledgeOnCloseApplicationEventSuccessfully();
@@ -336,7 +358,7 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testSubscribeGeneratesEvent() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         String topic = "topic1";
@@ -349,7 +371,7 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testUnsubscribeGeneratesUnsubscribeEvent() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         completeShareUnsubscribeApplicationEventSuccessfully(subscriptions);
@@ -361,7 +383,7 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testSubscribeToEmptyListActsAsUnsubscribe() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         completeShareUnsubscribeApplicationEventSuccessfully(subscriptions);
@@ -461,12 +483,12 @@ public class ShareConsumerImplTest {
 
     @Test
     public void testEnsurePollEventSentOnConsumerPoll() {
-        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), OffsetResetStrategy.NONE);
+        SubscriptionState subscriptions = new SubscriptionState(new LogContext(), AutoOffsetResetStrategy.NONE);
         consumer = newConsumer(subscriptions);
 
         final TopicPartition tp = new TopicPartition("topic", 0);
         final TopicIdPartition tip = new TopicIdPartition(Uuid.randomUuid(), tp);
-        final ShareInFlightBatch<String, String> batch = new ShareInFlightBatch<>(tip);
+        final ShareInFlightBatch<String, String> batch = new ShareInFlightBatch<>(0, tip);
         batch.addRecord(new ConsumerRecord<>("topic", 0, 2, "key1", "value1"));
         final ShareFetch<String, String> fetch = ShareFetch.empty();
         fetch.add(tip, batch);
@@ -503,7 +525,7 @@ public class ShareConsumerImplTest {
     }
 
     /**
-     * Tests {@link ShareConsumerImpl#processBackgroundEvents(Future, Timer) processBackgroundEvents}
+     * Tests {@link ShareConsumerImpl#processBackgroundEvents(Future, Timer, Predicate) processBackgroundEvents}
      * handles the case where the {@link Future} takes a bit of time to complete, but does within the timeout.
      */
     @Test
@@ -530,14 +552,14 @@ public class ShareConsumerImplTest {
             return null;
         }).when(future).get(any(Long.class), any(TimeUnit.class));
 
-        consumer.processBackgroundEvents(future, timer);
+        consumer.processBackgroundEvents(future, timer, e -> false);
 
         // 800 is the 1000 ms timeout (above) minus the 200 ms delay for the two incremental timeouts/retries.
         assertEquals(800, timer.remainingMs());
     }
 
     /**
-     * Tests {@link ShareConsumerImpl#processBackgroundEvents(Future, Timer) processBackgroundEvents}
+     * Tests {@link ShareConsumerImpl#processBackgroundEvents(Future, Timer, Predicate) processBackgroundEvents}
      * handles the case where the {@link Future} is already complete when invoked, so it doesn't have to wait.
      */
     @Test
@@ -549,7 +571,7 @@ public class ShareConsumerImplTest {
         // Create a future that is already completed.
         CompletableFuture<?> future = CompletableFuture.completedFuture(null);
 
-        consumer.processBackgroundEvents(future, timer);
+        consumer.processBackgroundEvents(future, timer, e -> false);
 
         // Because we didn't need to perform a timed get, we should still have every last millisecond
         // of our initial timeout.
@@ -557,7 +579,7 @@ public class ShareConsumerImplTest {
     }
 
     /**
-     * Tests {@link ShareConsumerImpl#processBackgroundEvents(Future, Timer) processBackgroundEvents}
+     * Tests {@link ShareConsumerImpl#processBackgroundEvents(Future, Timer, Predicate) processBackgroundEvents}
      * handles the case where the {@link Future} does not complete within the timeout.
      */
     @Test
@@ -573,7 +595,7 @@ public class ShareConsumerImplTest {
             throw new java.util.concurrent.TimeoutException("Intentional timeout");
         }).when(future).get(any(Long.class), any(TimeUnit.class));
 
-        assertThrows(TimeoutException.class, () -> consumer.processBackgroundEvents(future, timer));
+        assertThrows(TimeoutException.class, () -> consumer.processBackgroundEvents(future, timer, e -> false));
 
         // Because we forced our mocked future to continuously time out, we should have no time remaining.
         assertEquals(0, timer.remainingMs());
