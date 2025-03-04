@@ -45,10 +45,12 @@ import org.apache.kafka.clients.admin.internals.AdminFetchMetricsManager;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
 import org.apache.kafka.clients.admin.internals.AllBrokersStrategy;
 import org.apache.kafka.clients.admin.internals.AlterConsumerGroupOffsetsHandler;
+import org.apache.kafka.clients.admin.internals.AlterShareGroupOffsetsHandler;
 import org.apache.kafka.clients.admin.internals.CoordinatorKey;
 import org.apache.kafka.clients.admin.internals.DeleteConsumerGroupOffsetsHandler;
 import org.apache.kafka.clients.admin.internals.DeleteConsumerGroupsHandler;
 import org.apache.kafka.clients.admin.internals.DeleteRecordsHandler;
+import org.apache.kafka.clients.admin.internals.DeleteShareGroupsHandler;
 import org.apache.kafka.clients.admin.internals.DescribeClassicGroupsHandler;
 import org.apache.kafka.clients.admin.internals.DescribeConsumerGroupsHandler;
 import org.apache.kafka.clients.admin.internals.DescribeProducersHandler;
@@ -57,6 +59,7 @@ import org.apache.kafka.clients.admin.internals.DescribeTransactionsHandler;
 import org.apache.kafka.clients.admin.internals.FenceProducersHandler;
 import org.apache.kafka.clients.admin.internals.ListConsumerGroupOffsetsHandler;
 import org.apache.kafka.clients.admin.internals.ListOffsetsHandler;
+import org.apache.kafka.clients.admin.internals.ListShareGroupOffsetsHandler;
 import org.apache.kafka.clients.admin.internals.ListTransactionsHandler;
 import org.apache.kafka.clients.admin.internals.PartitionLeaderStrategy;
 import org.apache.kafka.clients.admin.internals.RemoveMembersFromConsumerGroupHandler;
@@ -82,7 +85,6 @@ import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.acl.AclBinding;
 import org.apache.kafka.common.acl.AclBindingFilter;
 import org.apache.kafka.common.acl.AclOperation;
-import org.apache.kafka.common.annotation.InterfaceStability;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.errors.ApiException;
@@ -182,8 +184,6 @@ import org.apache.kafka.common.requests.AddRaftVoterRequest;
 import org.apache.kafka.common.requests.AddRaftVoterResponse;
 import org.apache.kafka.common.requests.AlterClientQuotasRequest;
 import org.apache.kafka.common.requests.AlterClientQuotasResponse;
-import org.apache.kafka.common.requests.AlterConfigsRequest;
-import org.apache.kafka.common.requests.AlterConfigsResponse;
 import org.apache.kafka.common.requests.AlterPartitionReassignmentsRequest;
 import org.apache.kafka.common.requests.AlterPartitionReassignmentsResponse;
 import org.apache.kafka.common.requests.AlterReplicaLogDirsRequest;
@@ -312,9 +312,7 @@ import static org.apache.kafka.common.utils.Utils.closeQuietly;
  * <p>
  * This class is thread-safe.
  * </p>
- * The API of this class is evolving, see {@link Admin} for details.
  */
-@InterfaceStability.Evolving
 public class KafkaAdminClient extends AdminClient {
 
     /**
@@ -406,7 +404,6 @@ public class KafkaAdminClient extends AdminClient {
     private final long retryBackoffMs;
     private final long retryBackoffMaxMs;
     private final ExponentialBackoff retryBackoff;
-    private final long rebootstrapTriggerMs;
     private final MetadataRecoveryStrategy metadataRecoveryStrategy;
     private final Map<TopicPartition, Integer> partitionLeaderCache;
     private final AdminFetchMetricsManager adminFetchMetricsManager;
@@ -634,7 +631,6 @@ public class KafkaAdminClient extends AdminClient {
         List<MetricsReporter> reporters = CommonClientConfigs.metricsReporters(this.clientId, config);
         this.clientTelemetryReporter = clientTelemetryReporter;
         this.clientTelemetryReporter.ifPresent(reporters::add);
-        this.rebootstrapTriggerMs = config.getLong(AdminClientConfig.METADATA_RECOVERY_REBOOTSTRAP_TRIGGER_MS_CONFIG);
         this.metadataRecoveryStrategy = MetadataRecoveryStrategy.forName(config.getString(AdminClientConfig.METADATA_RECOVERY_STRATEGY_CONFIG));
         this.partitionLeaderCache = new HashMap<>();
         this.adminFetchMetricsManager = new AdminFetchMetricsManager(metrics);
@@ -727,14 +723,10 @@ public class KafkaAdminClient extends AdminClient {
         @Override
         public Node provide() {
             long now = time.milliseconds();
-            if (metadataRecoveryStrategy == MetadataRecoveryStrategy.REBOOTSTRAP &&
-                    metadataManager.needsRebootstrap(now, rebootstrapTriggerMs)) {
-                rebootstrap(now);
-            }
             LeastLoadedNode leastLoadedNode = client.leastLoadedNode(now);
             if (metadataRecoveryStrategy == MetadataRecoveryStrategy.REBOOTSTRAP
                     && !leastLoadedNode.hasNodeAvailableOrConnectionReady()) {
-                rebootstrap(now);
+                metadataManager.rebootstrap(now);
             }
 
             return leastLoadedNode.node();
@@ -743,11 +735,6 @@ public class KafkaAdminClient extends AdminClient {
         @Override
         public boolean supportsUseControllers() {
             return true;
-        }
-
-        private void rebootstrap(long now) {
-            client.closeAll();
-            metadataManager.rebootstrap(now);
         }
     }
 
@@ -2515,12 +2502,16 @@ public class KafkaAdminClient extends AdminClient {
             private boolean useMetadataRequest = false;
 
             @Override
-            AbstractRequest.Builder createRequest(int timeoutMs) {
+            AbstractRequest.Builder<?> createRequest(int timeoutMs) {
                 if (!useMetadataRequest) {
+                    if (metadataManager.usingBootstrapControllers() && options.includeFencedBrokers()) {
+                        throw new IllegalArgumentException("Cannot request fenced brokers from controller endpoint");
+                    }
                     return new DescribeClusterRequest.Builder(new DescribeClusterRequestData()
                         .setIncludeClusterAuthorizedOperations(options.includeAuthorizedOperations())
                         .setEndpointType(metadataManager.usingBootstrapControllers() ?
-                                EndpointType.CONTROLLER.id() : EndpointType.BROKER.id()));
+                                EndpointType.CONTROLLER.id() : EndpointType.BROKER.id())
+                        .setIncludeFencedBrokers(options.includeFencedBrokers()));
                 } else {
                     // Since this only requests node information, it's safe to pass true for allowAutoTopicCreation (and it
                     // simplifies communication with older brokers)
@@ -2536,7 +2527,6 @@ public class KafkaAdminClient extends AdminClient {
             void handleResponse(AbstractResponse abstractResponse) {
                 if (!useMetadataRequest) {
                     DescribeClusterResponse response = (DescribeClusterResponse) abstractResponse;
-
                     Errors error = Errors.forCode(response.data().errorCode());
                     if (error != Errors.NONE) {
                         ApiError apiError = new ApiError(error, response.data().errorMessage());
@@ -2581,6 +2571,12 @@ public class KafkaAdminClient extends AdminClient {
                     return false;
                 }
                 if (useMetadataRequest) {
+                    return false;
+                }
+
+                // If unsupportedVersion exception was caused by the option to include fenced brokers (only supported for version 2+)
+                // then we should not fall back to the metadataRequest.
+                if (options.includeFencedBrokers()) {
                     return false;
                 }
 
@@ -2660,6 +2656,7 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             void handleResponse(AbstractResponse abstractResponse) {
+                handleNotControllerError(abstractResponse);
                 CreateAclsResponse response = (CreateAclsResponse) abstractResponse;
                 List<AclCreationResult> responses = response.results();
                 Iterator<AclCreationResult> iter = responses.iterator();
@@ -2712,6 +2709,7 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             void handleResponse(AbstractResponse abstractResponse) {
+                handleNotControllerError(abstractResponse);
                 DeleteAclsResponse response = (DeleteAclsResponse) abstractResponse;
                 List<DeleteAclsResponseData.DeleteAclsFilterResult> results = response.filterResults();
                 Iterator<DeleteAclsResponseData.DeleteAclsFilterResult> iter = results.iterator();
@@ -2880,72 +2878,6 @@ public class KafkaAdminClient extends AdminClient {
     }
 
     @Override
-    @Deprecated
-    public AlterConfigsResult alterConfigs(Map<ConfigResource, Config> configs, final AlterConfigsOptions options) {
-        final Map<ConfigResource, KafkaFutureImpl<Void>> allFutures = new HashMap<>();
-        // We must make a separate AlterConfigs request for every BROKER resource we want to alter
-        // and send the request to that specific node. Other resources are grouped together into
-        // a single request that may be sent to any node.
-        final Collection<ConfigResource> unifiedRequestResources = new ArrayList<>();
-
-        for (ConfigResource resource : configs.keySet()) {
-            Integer node = nodeFor(resource);
-            if (node != null) {
-                NodeProvider nodeProvider = new ConstantBrokerOrActiveKController(node);
-                allFutures.putAll(alterConfigs(configs, options, Collections.singleton(resource), nodeProvider));
-            } else
-                unifiedRequestResources.add(resource);
-        }
-        if (!unifiedRequestResources.isEmpty())
-          allFutures.putAll(alterConfigs(configs, options, unifiedRequestResources, new LeastLoadedBrokerOrActiveKController()));
-        return new AlterConfigsResult(new HashMap<>(allFutures));
-    }
-
-    private Map<ConfigResource, KafkaFutureImpl<Void>> alterConfigs(Map<ConfigResource, Config> configs,
-                                                                    final AlterConfigsOptions options,
-                                                                    Collection<ConfigResource> resources,
-                                                                    NodeProvider nodeProvider) {
-        final Map<ConfigResource, KafkaFutureImpl<Void>> futures = new HashMap<>();
-        final Map<ConfigResource, AlterConfigsRequest.Config> requestMap = new HashMap<>(resources.size());
-        for (ConfigResource resource : resources) {
-            List<AlterConfigsRequest.ConfigEntry> configEntries = new ArrayList<>();
-            for (ConfigEntry configEntry: configs.get(resource).entries())
-                configEntries.add(new AlterConfigsRequest.ConfigEntry(configEntry.name(), configEntry.value()));
-            requestMap.put(resource, new AlterConfigsRequest.Config(configEntries));
-            futures.put(resource, new KafkaFutureImpl<>());
-        }
-
-        final long now = time.milliseconds();
-        runnable.call(new Call("alterConfigs", calcDeadlineMs(now, options.timeoutMs()), nodeProvider) {
-
-            @Override
-            public AlterConfigsRequest.Builder createRequest(int timeoutMs) {
-                return new AlterConfigsRequest.Builder(requestMap, options.shouldValidateOnly());
-            }
-
-            @Override
-            public void handleResponse(AbstractResponse abstractResponse) {
-                AlterConfigsResponse response = (AlterConfigsResponse) abstractResponse;
-                for (Map.Entry<ConfigResource, KafkaFutureImpl<Void>> entry : futures.entrySet()) {
-                    KafkaFutureImpl<Void> future = entry.getValue();
-                    ApiException exception = response.errors().get(entry.getKey()).exception();
-                    if (exception != null) {
-                        future.completeExceptionally(exception);
-                    } else {
-                        future.complete(null);
-                    }
-                }
-            }
-
-            @Override
-            void handleFailure(Throwable throwable) {
-                completeAllExceptionally(futures.values(), throwable);
-            }
-        }, now);
-        return futures;
-    }
-
-    @Override
     public AlterConfigsResult incrementalAlterConfigs(Map<ConfigResource, Collection<AlterConfigOp>> configs,
                                                       final AlterConfigsOptions options) {
         final Map<ConfigResource, KafkaFutureImpl<Void>> allFutures = new HashMap<>();
@@ -2996,6 +2928,7 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             public void handleResponse(AbstractResponse abstractResponse) {
+                handleNotControllerError(abstractResponse);
                 IncrementalAlterConfigsResponse response = (IncrementalAlterConfigsResponse) abstractResponse;
                 Map<ConfigResource, ApiError> errors = IncrementalAlterConfigsResponse.fromResponseData(response.data());
                 for (Map.Entry<ConfigResource, KafkaFutureImpl<Void>> entry : futures.entrySet()) {
@@ -3855,48 +3788,6 @@ public class KafkaAdminClient extends AdminClient {
         return new DeleteConsumerGroupOffsetsResult(future.get(CoordinatorKey.byGroupId(groupId)), partitions);
     }
 
-    private static final class ListShareGroupsResults {
-        private final List<Throwable> errors;
-        private final HashMap<String, ShareGroupListing> listings;
-        private final HashSet<Node> remaining;
-        private final KafkaFutureImpl<Collection<Object>> future;
-
-        ListShareGroupsResults(Collection<Node> leaders,
-                               KafkaFutureImpl<Collection<Object>> future) {
-            this.errors = new ArrayList<>();
-            this.listings = new HashMap<>();
-            this.remaining = new HashSet<>(leaders);
-            this.future = future;
-            tryComplete();
-        }
-
-        synchronized void addError(Throwable throwable, Node node) {
-            ApiError error = ApiError.fromThrowable(throwable);
-            if (error.message() == null || error.message().isEmpty()) {
-                errors.add(error.error().exception("Error listing groups on " + node));
-            } else {
-                errors.add(error.error().exception("Error listing groups on " + node + ": " + error.message()));
-            }
-        }
-
-        synchronized void addListing(ShareGroupListing listing) {
-            listings.put(listing.groupId(), listing);
-        }
-
-        synchronized void tryComplete(Node leader) {
-            remaining.remove(leader);
-            tryComplete();
-        }
-
-        private synchronized void tryComplete() {
-            if (remaining.isEmpty()) {
-                ArrayList<Object> results = new ArrayList<>(listings.values());
-                results.addAll(errors);
-                future.complete(results);
-            }
-        }
-    }
-
     @Override
     public DescribeShareGroupsResult describeShareGroups(final Collection<String> groupIds,
                                                          final DescribeShareGroupsOptions options) {
@@ -3909,90 +3800,20 @@ public class KafkaAdminClient extends AdminClient {
     }
 
     @Override
-    public ListShareGroupsResult listShareGroups(ListShareGroupsOptions options) {
-        final KafkaFutureImpl<Collection<Object>> all = new KafkaFutureImpl<>();
-        final long nowMetadata = time.milliseconds();
-        final long deadline = calcDeadlineMs(nowMetadata, options.timeoutMs());
-        runnable.call(new Call("findAllBrokers", deadline, new LeastLoadedNodeProvider()) {
-            @Override
-            MetadataRequest.Builder createRequest(int timeoutMs) {
-                return new MetadataRequest.Builder(new MetadataRequestData()
-                        .setTopics(Collections.emptyList())
-                        .setAllowAutoTopicCreation(true));
-            }
+    public AlterShareGroupOffsetsResult alterShareGroupOffsets(String groupId, Map<TopicPartition, Long> offsets, AlterShareGroupOffsetsOptions options) {
+        SimpleAdminApiFuture<CoordinatorKey, Map<TopicPartition, Errors>> future = AlterShareGroupOffsetsHandler.newFuture(groupId);
+        AlterShareGroupOffsetsHandler handler = new AlterShareGroupOffsetsHandler(groupId, offsets, logContext);
+        invokeDriver(handler, future, options.timeoutMs);
+        return new AlterShareGroupOffsetsResult(future.get(CoordinatorKey.byGroupId(groupId)));
+    }
 
-            @Override
-            void handleResponse(AbstractResponse abstractResponse) {
-                MetadataResponse metadataResponse = (MetadataResponse) abstractResponse;
-                Collection<Node> nodes = metadataResponse.brokers();
-                if (nodes.isEmpty())
-                    throw new StaleMetadataException("Metadata fetch failed due to missing broker list");
-
-                HashSet<Node> allNodes = new HashSet<>(nodes);
-                final ListShareGroupsResults results = new ListShareGroupsResults(allNodes, all);
-
-                for (final Node node : allNodes) {
-                    final long nowList = time.milliseconds();
-                    runnable.call(new Call("listShareGroups", deadline, new ConstantNodeIdProvider(node.id())) {
-                        @Override
-                        ListGroupsRequest.Builder createRequest(int timeoutMs) {
-                            List<String> states = options.states()
-                                    .stream()
-                                    .map(GroupState::toString)
-                                    .collect(Collectors.toList());
-                            List<String> types = Collections.singletonList(GroupType.SHARE.toString());
-                            return new ListGroupsRequest.Builder(new ListGroupsRequestData()
-                                    .setStatesFilter(states)
-                                    .setTypesFilter(types)
-                            );
-                        }
-
-                        private void maybeAddShareGroup(ListGroupsResponseData.ListedGroup group) {
-                            final String groupId = group.groupId();
-                            final Optional<GroupState> state = group.groupState().isEmpty()
-                                    ? Optional.empty()
-                                    : Optional.of(GroupState.parse(group.groupState()));
-                            final ShareGroupListing groupListing = new ShareGroupListing(groupId, state);
-                            results.addListing(groupListing);
-                        }
-
-                        @Override
-                        void handleResponse(AbstractResponse abstractResponse) {
-                            final ListGroupsResponse response = (ListGroupsResponse) abstractResponse;
-                            synchronized (results) {
-                                Errors error = Errors.forCode(response.data().errorCode());
-                                if (error == Errors.COORDINATOR_LOAD_IN_PROGRESS || error == Errors.COORDINATOR_NOT_AVAILABLE) {
-                                    throw error.exception();
-                                } else if (error != Errors.NONE) {
-                                    results.addError(error.exception(), node);
-                                } else {
-                                    for (ListGroupsResponseData.ListedGroup group : response.data().groups()) {
-                                        maybeAddShareGroup(group);
-                                    }
-                                }
-                                results.tryComplete(node);
-                            }
-                        }
-
-                        @Override
-                        void handleFailure(Throwable throwable) {
-                            synchronized (results) {
-                                results.addError(throwable, node);
-                                results.tryComplete(node);
-                            }
-                        }
-                    }, nowList);
-                }
-            }
-
-            @Override
-            void handleFailure(Throwable throwable) {
-                KafkaException exception = new KafkaException("Failed to find brokers to send ListGroups", throwable);
-                all.complete(Collections.singletonList(exception));
-            }
-        }, nowMetadata);
-
-        return new ListShareGroupsResult(all);
+    @Override
+    public ListShareGroupOffsetsResult listShareGroupOffsets(final Map<String, ListShareGroupOffsetsSpec> groupSpecs,
+                                                             final ListShareGroupOffsetsOptions options) {
+        SimpleAdminApiFuture<CoordinatorKey, Map<TopicPartition, Long>> future = ListShareGroupOffsetsHandler.newFuture(groupSpecs.keySet());
+        ListShareGroupOffsetsHandler handler = new ListShareGroupOffsetsHandler(groupSpecs, logContext);
+        invokeDriver(handler, future, options.timeoutMs);
+        return new ListShareGroupOffsetsResult(future.all());
     }
 
     @Override
@@ -4003,6 +3824,16 @@ public class KafkaAdminClient extends AdminClient {
         DescribeClassicGroupsHandler handler = new DescribeClassicGroupsHandler(options.includeAuthorizedOperations(), logContext);
         invokeDriver(handler, future, options.timeoutMs);
         return new DescribeClassicGroupsResult(future.all().entrySet().stream()
+            .collect(Collectors.toMap(entry -> entry.getKey().idValue, Map.Entry::getValue)));
+    }
+
+    @Override
+    public DeleteShareGroupsResult deleteShareGroups(Collection<String> groupIds, DeleteShareGroupsOptions options) {
+        SimpleAdminApiFuture<CoordinatorKey, Void> future =
+            DeleteShareGroupsHandler.newFuture(groupIds);
+        DeleteShareGroupsHandler handler = new DeleteShareGroupsHandler(logContext);
+        invokeDriver(handler, future, options.timeoutMs);
+        return new DeleteShareGroupsResult(future.all().entrySet().stream()
             .collect(Collectors.toMap(entry -> entry.getKey().idValue, Map.Entry::getValue)));
     }
 
@@ -4280,8 +4111,11 @@ public class KafkaAdminClient extends AdminClient {
     }
 
     private void handleNotControllerError(AbstractResponse response) throws ApiException {
+        // When sending requests directly to the follower controller, it might return NOT_LEADER_OR_FOLLOWER error.
         if (response.errorCounts().containsKey(Errors.NOT_CONTROLLER)) {
             handleNotControllerError(Errors.NOT_CONTROLLER);
+        } else if (metadataManager.usingBootstrapControllers() && response.errorCounts().containsKey(Errors.NOT_LEADER_OR_FOLLOWER)) {
+            handleNotControllerError(Errors.NOT_LEADER_OR_FOLLOWER);
         }
     }
 
@@ -4843,6 +4677,7 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             void handleResponse(AbstractResponse response) {
+                handleNotControllerError(response);
                 final DescribeQuorumResponse quorumResponse = (DescribeQuorumResponse) response;
                 if (quorumResponse.data().errorCode() != Errors.NONE.code()) {
                     throw Errors.forCode(quorumResponse.data().errorCode()).exception(quorumResponse.data().errorMessage());
@@ -4894,7 +4729,7 @@ public class KafkaAdminClient extends AdminClient {
         final KafkaFutureImpl<Void> future = new KafkaFutureImpl<>();
         final long now = time.milliseconds();
         final Call call = new Call("unregisterBroker", calcDeadlineMs(now, options.timeoutMs()),
-                new LeastLoadedNodeProvider()) {
+                new LeastLoadedBrokerOrActiveKController()) {
 
             @Override
             UnregisterBrokerRequest.Builder createRequest(int timeoutMs) {
@@ -5030,16 +4865,17 @@ public class KafkaAdminClient extends AdminClient {
                         setHost(endpoint.host()).
                         setPort(endpoint.port())));
                 return new AddRaftVoterRequest.Builder(
-                   new AddRaftVoterRequestData().
-                       setClusterId(options.clusterId().orElse(null)).
-                       setTimeoutMs(timeoutMs).
-                       setVoterId(voterId) .
-                       setVoterDirectoryId(voterDirectoryId).
-                       setListeners(listeners));
+                        new AddRaftVoterRequestData().
+                            setClusterId(options.clusterId().orElse(null)).
+                            setTimeoutMs(timeoutMs).
+                            setVoterId(voterId) .
+                            setVoterDirectoryId(voterDirectoryId).
+                            setListeners(listeners));
             }
 
             @Override
             void handleResponse(AbstractResponse response) {
+                handleNotControllerError(response);
                 AddRaftVoterResponse addResponse = (AddRaftVoterResponse) response;
                 if (addResponse.data().errorCode() != Errors.NONE.code()) {
                     ApiError error = new ApiError(
@@ -5084,6 +4920,7 @@ public class KafkaAdminClient extends AdminClient {
 
             @Override
             void handleResponse(AbstractResponse response) {
+                handleNotControllerError(response);
                 RemoveRaftVoterResponse addResponse = (RemoveRaftVoterResponse) response;
                 if (addResponse.data().errorCode() != Errors.NONE.code()) {
                     ApiError error = new ApiError(
