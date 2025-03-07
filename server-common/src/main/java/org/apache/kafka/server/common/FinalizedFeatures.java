@@ -82,4 +82,17 @@ public final class FinalizedFeatures {
                 ", finalizedFeaturesEpoch=" + finalizedFeaturesEpoch +
                 ")";
     }
+
+    public FinalizedFeatures setFinalizedLevel(String key, short level) {
+        if (level == (short) 0) {
+            return this;
+        } else {
+            Map<String, Short> newFinalizedFeatures = new HashMap<>(finalizedFeatures);
+            newFinalizedFeatures.put(key, level);
+            return new FinalizedFeatures(
+                metadataVersion,
+                newFinalizedFeatures,
+                finalizedFeaturesEpoch);
+        }
+    }
 }
