@@ -48,6 +48,17 @@ public final class FinalizedFeatures {
         }
     }
 
+    // Internal constructor only for copying FinalizedFeatures.
+    private FinalizedFeatures(
+        MetadataVersion metadataVersion,
+        Map<String, Short> finalizedFeatures,
+        long finalizedFeaturesEpoch
+    ) {
+        this.metadataVersion = metadataVersion;
+        this.finalizedFeatures = new HashMap<>(finalizedFeatures);
+        this.finalizedFeaturesEpoch = finalizedFeaturesEpoch;
+    }
+
     public MetadataVersion metadataVersion() {
         return metadataVersion;
     }
