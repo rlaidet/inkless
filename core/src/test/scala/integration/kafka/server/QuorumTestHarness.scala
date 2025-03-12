@@ -266,7 +266,7 @@ abstract class QuorumTestHarness extends Logging {
 
   val faultHandler = faultHandlerFactory.faultHandler
 
-  def baseProps(): Properties = new Properties()
+  var inklessMode: Option[InklessMode] = None
 
   // Note: according to the junit documentation: "JUnit Jupiter does not guarantee the execution
   // order of multiple @BeforeEach methods that are declared within a single test class or test
@@ -276,6 +276,8 @@ abstract class QuorumTestHarness extends Logging {
   @BeforeEach
   def setUp(testInfo: TestInfo): Unit = {
     this.testInfo = testInfo
+    val inklessEnabled = testInfo.getTags.contains("inkless")
+    if (inklessEnabled) this.inklessMode = Some(new InklessMode(pgContainer, minioContainer))
     Exit.setExitProcedure((code, message) => {
       try {
         throw new RuntimeException(s"exit($code, $message) called!")
@@ -299,6 +301,17 @@ abstract class QuorumTestHarness extends Logging {
     val name = testInfo.getTestMethod.toScala
       .map(_.toString)
       .getOrElse("[unspecified]")
+
+    val props = new Properties()
+    if (inklessEnabled) {
+      pgContainer.createDatabase(testInfo)
+      minioContainer.createBucket(testInfo)
+
+      inklessMode.foreach(mode => mode.inklessControlPlaneConfig(props))
+    }
+
+    info(s"Running KRAFT test $name")
+    implementation = newKRaftQuorum(testInfo, props)
     if (TestInfoUtils.isKRaft(testInfo)) {
       info(s"Running KRAFT test $name")
       implementation = newKRaftQuorum(testInfo, baseProps())
@@ -490,6 +503,17 @@ abstract class QuorumTestHarness extends Logging {
 
 object QuorumTestHarness {
   val ZkClientEventThreadSuffix = "-EventThread"
+
+  val pgContainer: InklessPostgreSQLContainer = {
+    val container = PostgreSQLTestContainer.container()
+    container.start()
+    container
+  }
+  val minioContainer: MinioContainer = {
+    val container = S3TestContainer.minio()
+    container.start()
+    container
+  }
 
   /**
    * Verify that a previous test that doesn't use QuorumTestHarness hasn't left behind an unexpected thread.

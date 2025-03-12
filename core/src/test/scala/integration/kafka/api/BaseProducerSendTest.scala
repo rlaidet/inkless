@@ -21,7 +21,7 @@ import java.time.Duration
 import java.nio.charset.StandardCharsets
 import java.util.{Collections, Properties}
 import java.util.concurrent.TimeUnit
-import kafka.integration.InklessServerTestHarness
+import kafka.integration.KafkaServerTestHarness
 import kafka.security.JaasTestUtils
 import kafka.server.KafkaConfig
 import kafka.utils.{TestInfoUtils, TestUtils}
@@ -36,7 +36,7 @@ import org.apache.kafka.common.security.auth.SecurityProtocol
 import org.apache.kafka.common.{KafkaException, TopicPartition}
 import org.apache.kafka.server.config.ServerLogConfigs
 import org.junit.jupiter.api.Assertions._
-import org.junit.jupiter.api.{AfterEach, BeforeEach, TestInfo}
+import org.junit.jupiter.api.{AfterEach, BeforeEach, Tag, TestInfo}
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.MethodSource
 
@@ -45,9 +45,11 @@ import scala.concurrent.ExecutionException
 import scala.jdk.CollectionConverters._
 import scala.jdk.javaapi.OptionConverters
 
-abstract class BaseProducerSendTest extends InklessServerTestHarness {
+@Tag("inkless")
+abstract class BaseProducerSendTest extends KafkaServerTestHarness {
 
-  def generateConfigs(overridingProps: Properties): scala.collection.Seq[KafkaConfig] = {
+  def generateConfigs: scala.collection.Seq[KafkaConfig] = {
+    val overridingProps = new Properties()
     val numServers = 2
     overridingProps.put(ServerLogConfigs.NUM_PARTITIONS_CONFIG, 4.toString)
     TestUtils.createBrokerConfigs(
@@ -55,7 +57,8 @@ abstract class BaseProducerSendTest extends InklessServerTestHarness {
       zkConnectOrNull,
       interBrokerSecurityProtocol = Some(securityProtocol),
       trustStoreFile = trustStoreFile,
-      saslProperties = serverSaslProperties
+      saslProperties = serverSaslProperties,
+      inklessMode = inklessMode
     ).map(KafkaConfig.fromProps(_, overridingProps))
   }
 
