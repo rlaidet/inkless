@@ -30,6 +30,7 @@ import org.apache.kafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.test.TestUtils;
 import org.apache.kafka.common.utils.MockTime;
 import org.apache.kafka.common.utils.Time;
+import org.apache.kafka.server.common.RequestLocal;
 import org.apache.kafka.storage.internals.log.LogConfig;
 import org.apache.kafka.storage.log.metrics.BrokerTopicStats;
 
@@ -351,7 +352,7 @@ class WriterPropertyTest {
                     sentRequests.computeIfAbsent(entry.getKey(), ignore -> new ArrayList<>())
                         .add(entry.getValue());
                 }
-                final var responseFuture = writer.write(request, TOPIC_CONFIGS);
+                final var responseFuture = writer.write(request, TOPIC_CONFIGS, RequestLocal.noCaching());
                 waitingResponseFutures.add(responseFuture);
                 requestCount += 1;
             }
