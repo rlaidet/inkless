@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
-import java.util.OptionalInt;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -182,9 +182,9 @@ class UnifiedLog {
                         .collect(Collectors.joining(",")));
             }
         }
-        OptionalInt lastLeaderEpochOpt = (lastLeaderEpoch != RecordBatch.NO_PARTITION_LEADER_EPOCH)
-            ? OptionalInt.of(lastLeaderEpoch)
-            : OptionalInt.empty();
+        Optional<Integer> lastLeaderEpochOpt = (lastLeaderEpoch != RecordBatch.NO_PARTITION_LEADER_EPOCH)
+            ? Optional.of(lastLeaderEpoch)
+            : Optional.empty();
 
         return new LogAppendInfo(firstOffset, lastOffset, lastLeaderEpochOpt, maxTimestamp,
             RecordBatch.NO_TIMESTAMP, logStartOffset, RecordValidationStats.EMPTY, sourceCompression,
