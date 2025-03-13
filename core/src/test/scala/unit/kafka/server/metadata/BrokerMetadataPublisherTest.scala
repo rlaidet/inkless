@@ -18,6 +18,10 @@
 package kafka.server.metadata
 
 import kafka.coordinator.transaction.TransactionCoordinator
+
+import java.util.Collections.{singleton, singletonList, singletonMap}
+import java.util.Properties
+import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import kafka.log.LogManager
 import kafka.server.{BrokerServer, KafkaConfig, ReplicaManager}
 import kafka.utils.TestUtils
@@ -29,8 +33,9 @@ import org.apache.kafka.common.test.{KafkaClusterTestKit, TestKitNodes}
 import org.apache.kafka.common.utils.Exit
 import org.apache.kafka.coordinator.group.GroupCoordinator
 import org.apache.kafka.coordinator.share.ShareCoordinator
-import org.apache.kafka.image.loader.LogDeltaManifest
 import org.apache.kafka.image.{MetadataDelta, MetadataImage, MetadataImageTest, MetadataProvenance}
+import org.apache.kafka.image.loader.LogDeltaManifest
+import org.apache.kafka.metadata.publisher.AclPublisher
 import org.apache.kafka.network.SocketServerConfigs
 import org.apache.kafka.raft.LeaderAndEpoch
 import org.apache.kafka.server.common.{KRaftVersion, MetadataVersion}
@@ -43,10 +48,7 @@ import org.mockito.Mockito.{doThrow, mock, verify}
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 
-import java.util.Collections.{singleton, singletonList, singletonMap}
-import java.util.Properties
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.jdk.CollectionConverters._
 
 class BrokerMetadataPublisherTest {
