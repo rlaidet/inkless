@@ -96,7 +96,16 @@ public final class FinalizedFeatures {
 
     public FinalizedFeatures setFinalizedLevel(String key, short level) {
         if (level == (short) 0) {
-            return this;
+            if (finalizedFeatures.containsKey(key)) {
+                Map<String, Short> newFinalizedFeatures = new HashMap<>(finalizedFeatures);
+                newFinalizedFeatures.remove(key);
+                return new FinalizedFeatures(
+                    metadataVersion,
+                    newFinalizedFeatures,
+                    finalizedFeaturesEpoch);
+            } else {
+                return this;
+            }
         } else {
             Map<String, Short> newFinalizedFeatures = new HashMap<>(finalizedFeatures);
             newFinalizedFeatures.put(key, level);

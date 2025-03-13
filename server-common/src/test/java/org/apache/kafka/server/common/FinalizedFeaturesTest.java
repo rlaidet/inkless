@@ -47,4 +47,22 @@ class FinalizedFeaturesTest {
                 finalizedFeatures.finalizedFeatures().get("foo"));
         assertEquals(1, finalizedFeatures.finalizedFeatures().size());
     }
+
+    @Test
+    public void testSetFinalizedLevel() {
+        FinalizedFeatures finalizedFeatures = new FinalizedFeatures(
+            MINIMUM_VERSION,
+            Collections.singletonMap("foo", (short) 2),
+            123,
+            true
+        );
+
+        // Override an existing finalized feature version to 0
+        FinalizedFeatures removedFeatures = finalizedFeatures.setFinalizedLevel("foo", (short) 0);
+        assertNull(removedFeatures.finalizedFeatures().get("foo"));
+
+        // Override a missing finalized feature version to 0
+        FinalizedFeatures sameFeatures = removedFeatures.setFinalizedLevel("foo", (short) 0);
+        assertEquals(sameFeatures.finalizedFeatures(), removedFeatures.finalizedFeatures());
+    }
 }
