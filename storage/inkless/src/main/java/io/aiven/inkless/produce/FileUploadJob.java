@@ -23,6 +23,8 @@ import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.Callable;
@@ -46,16 +48,18 @@ public class FileUploadJob implements Callable<ObjectKey> {
     private final Time time;
     private final int attempts;
     private final Duration retryBackoff;
-    private final byte[] data;
+    private final InputStream data;
+    private final long length;
     private final Consumer<Long> durationCallback;
 
     public FileUploadJob(final ObjectKeyCreator objectKeyCreator,
-                  final ObjectUploader objectUploader,
-                  final Time time,
-                  final int attempts,
-                  final Duration retryBackoff,
-                  final byte[] data,
-                  final Consumer<Long> durationCallback) {
+                         final ObjectUploader objectUploader,
+                         final Time time,
+                         final int attempts,
+                         final Duration retryBackoff,
+                         final InputStream data,
+                         final long length,
+                         final Consumer<Long> durationCallback) {
         this.objectKeyCreator = Objects.requireNonNull(objectKeyCreator, "objectKeyCreator cannot be null");
         this.objectUploader = Objects.requireNonNull(objectUploader, "objectUploader cannot be null");
         this.time = Objects.requireNonNull(time, "time cannot be null");
@@ -65,7 +69,29 @@ public class FileUploadJob implements Callable<ObjectKey> {
         this.attempts = attempts;
         this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff cannot be null");
         this.data = Objects.requireNonNull(data, "data cannot be null");
+        this.length = length;
         this.durationCallback = Objects.requireNonNull(durationCallback, "durationCallback cannot be null");
+    }
+
+    public static FileUploadJob createFromByteArray(final ObjectKeyCreator objectKeyCreator,
+                                       final ObjectUploader objectUploader,
+                                       final Time time,
+                                       final int attempts,
+                                       final Duration retryBackoff,
+                                       final byte[] data,
+                                       final Consumer<Long> durationCallback) {
+        Objects.requireNonNull(data, "data cannot be null");
+        return new FileUploadJob(
+            objectKeyCreator,
+            objectUploader,
+            time,
+            attempts,
+            retryBackoff,
+            new ByteArrayInputStream(data),
+            data.length,
+            durationCallback
+        );
+
     }
 
     @Override
@@ -78,7 +104,7 @@ public class FileUploadJob implements Callable<ObjectKey> {
         final Exception uploadError;
         try {
             objectKey = objectKeyCreator.create(Uuid.randomUuid().toString());
-            uploadError = uploadWithRetry(objectKey, data);
+            uploadError = uploadWithRetry(objectKey, data, length);
         } catch (final Exception e) {
             LOGGER.error("Unexpected exception", e);
             throw e;
@@ -91,12 +117,12 @@ public class FileUploadJob implements Callable<ObjectKey> {
         }
     }
 
-    private Exception uploadWithRetry(final ObjectKey objectKey, final byte[] data) {
+    private Exception uploadWithRetry(final ObjectKey objectKey, final InputStream data, final long length) {
         LOGGER.debug("Uploading {}", objectKey);
         Exception error = null;
         for (int attempt = 0; attempt < attempts; attempt++) {
             try {
-                objectUploader.upload(objectKey, data);
+                objectUploader.upload(objectKey, data, length);
                 LOGGER.debug("Successfully uploaded {}", objectKey);
                 return null;
             } catch (final StorageBackendException e) {
