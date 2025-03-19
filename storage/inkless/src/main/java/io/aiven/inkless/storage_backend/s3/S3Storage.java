@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -62,13 +63,14 @@ public class S3Storage implements StorageBackend {
         this.bucketName = config.bucketName();
     }
 
-    @Override
-    public void upload(final ObjectKey key, final byte[] data) throws StorageBackendException {
+    public void upload(final ObjectKey key, final InputStream inputStream, final long length) throws StorageBackendException {
+        Objects.requireNonNull(key, "key cannot be null");
+        Objects.requireNonNull(inputStream, "inputStream cannot be null");
         final PutObjectRequest putObjectRequest = PutObjectRequest.builder()
             .bucket(bucketName)
             .key(key.value())
             .build();
-        final RequestBody requestBody = RequestBody.fromBytes(data);
+        final RequestBody requestBody = RequestBody.fromInputStream(inputStream, length);
         try {
             s3Client.putObject(putObjectRequest, requestBody);
         } catch (final ApiCallTimeoutException | ApiCallAttemptTimeoutException e) {
