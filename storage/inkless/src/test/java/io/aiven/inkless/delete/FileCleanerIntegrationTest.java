@@ -297,7 +297,7 @@ class FileCleanerIntegrationTest {
                                final ConcurrentHashMap<TopicIdPartition, Long> fetchPositions,
                                final ConcurrentMap<TopicIdPartition, List<RecordBatch>> records) throws InterruptedException {
         final FetchParams params = new FetchParams(FETCH_VERSION,
-            -1, -1, -1, -1,
+            -1, -1, -1, -1, -1,
             FetchIsolation.LOG_END, Optional.empty());
 
         final AtomicBoolean inconsistentOffset = new AtomicBoolean(false);

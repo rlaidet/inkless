@@ -16,6 +16,7 @@
  */
 package kafka.server;
 
+import java.util.Locale;
 import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -26,7 +27,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.internals.AutoOffsetResetStrategy;
+import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -182,7 +183,7 @@ public class InklessClusterTest {
     private static void consume(TimestampType timestampType, Map<String, Object> clientConfigs, String topicName, long now, int numRecords) {
         final Map<String, Object> consumerConfigs = new HashMap<>(clientConfigs);
         // by default is latest and nothing would get consumed.
-        consumerConfigs.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, AutoOffsetResetStrategy.EARLIEST.name());
+        consumerConfigs.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, OffsetResetStrategy.EARLIEST.name().toLowerCase(Locale.ROOT));
         int recordsConsumed = 0;
         try (Consumer<byte[], byte[]> consumer = new KafkaConsumer<>(consumerConfigs)) {
             consumer.assign(Collections.singletonList(new TopicPartition(topicName, 0)));

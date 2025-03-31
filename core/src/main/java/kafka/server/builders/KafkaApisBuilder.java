@@ -43,7 +43,6 @@ import org.apache.kafka.storage.log.metrics.BrokerTopicStats;
 import java.util.Collections;
 import java.util.Optional;
 
-import scala.Option;
 import scala.jdk.javaapi.OptionConverters;
 
 
@@ -221,6 +220,6 @@ public class KafkaApisBuilder {
                              tokenManager,
                              apiVersionManager,
                              OptionConverters.toScala(clientMetricsManager),
-                             Option.empty());
+                             OptionConverters.toScala(Optional.empty()));
     }
 }

@@ -35,14 +35,15 @@ import org.apache.kafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.utils.PrimitiveRef;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.metadata.LeaderAndIsr;
+import org.apache.kafka.server.common.MetadataVersion;
 import org.apache.kafka.server.common.RequestLocal;
 import org.apache.kafka.server.record.BrokerCompressionType;
 import org.apache.kafka.storage.internals.log.AppendOrigin;
 import org.apache.kafka.storage.internals.log.LeaderHwChange;
-import org.apache.kafka.storage.internals.log.LocalLog;
 import org.apache.kafka.storage.internals.log.LogAppendInfo;
 import org.apache.kafka.storage.internals.log.LogConfig;
 import org.apache.kafka.storage.internals.log.LogValidator;
+import org.apache.kafka.storage.log.metrics.BrokerTopicMetrics;
 import org.apache.kafka.storage.log.metrics.BrokerTopicStats;
 
 import org.slf4j.Logger;
@@ -51,11 +52,11 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.Map;
-import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static org.apache.kafka.storage.internals.log.UnifiedLog.UNKNOWN_OFFSET;
+import static org.apache.kafka.storage.internals.log.LocalLog.UNKNOWN_OFFSET;
 
 // TODO: This method is being migrated to Java and this is a placeholder for when it becomes available
 //  on UnifiedLog.java from apache/kafka#19030
@@ -96,7 +97,7 @@ class UnifiedLog {
                                                    int leaderEpoch,
                                                    BrokerTopicStats brokerTopicStats) {
         int validBytesCount = 0;
-        long firstOffset = LocalLog.UNKNOWN_OFFSET;
+        long firstOffset = UNKNOWN_OFFSET;
         long lastOffset = -1L;
         int lastLeaderEpoch = RecordBatch.NO_PARTITION_LEADER_EPOCH;
         CompressionType sourceCompression = CompressionType.NONE;
@@ -182,11 +183,11 @@ class UnifiedLog {
                         .collect(Collectors.joining(",")));
             }
         }
-        Optional<Integer> lastLeaderEpochOpt = (lastLeaderEpoch != RecordBatch.NO_PARTITION_LEADER_EPOCH)
-            ? Optional.of(lastLeaderEpoch)
-            : Optional.empty();
+        OptionalInt lastLeaderEpochOpt = (lastLeaderEpoch != RecordBatch.NO_PARTITION_LEADER_EPOCH)
+            ? OptionalInt.of(lastLeaderEpoch)
+            : OptionalInt.empty();
 
-        return new LogAppendInfo(firstOffset, lastOffset, lastLeaderEpochOpt, maxTimestamp,
+        return new LogAppendInfo(firstOffset, lastOffset, lastLeaderEpochOpt, maxTimestamp, RecordBatch.NO_TIMESTAMP,
             RecordBatch.NO_TIMESTAMP, logStartOffset, RecordValidationStats.EMPTY, sourceCompression,
             validBytesCount, lastOffsetOfFirstBatch, Collections.emptyList(), LeaderHwChange.NONE);
     }
@@ -276,7 +277,8 @@ class UnifiedLog {
                 config.messageTimestampBeforeMaxMs,
                 config.messageTimestampAfterMaxMs,
                 LEADER_EPOCH,
-                APPEND_ORIGIN
+                APPEND_ORIGIN,
+                MetadataVersion.latestProduction()
             );
             LogValidator.ValidationResult validateAndOffsetAssignResult = validator.validateMessagesAndAssignOffsets(
                 offset,
@@ -323,4 +325,27 @@ class UnifiedLog {
         return appendInfo;
     }
 
+    public static LogValidator.MetricsRecorder newValidatorMetricsRecorder(BrokerTopicMetrics allTopicsStats) {
+        return new LogValidator.MetricsRecorder() {
+            public void recordInvalidMagic() {
+                allTopicsStats.invalidMagicNumberRecordsPerSec().mark();
+            }
+
+            public void recordInvalidOffset() {
+                allTopicsStats.invalidOffsetOrSequenceRecordsPerSec().mark();
+            }
+
+            public void recordInvalidSequence() {
+                allTopicsStats.invalidOffsetOrSequenceRecordsPerSec().mark();
+            }
+
+            public void recordInvalidChecksums() {
+                allTopicsStats.invalidMessageCrcRecordsPerSec().mark();
+            }
+
+            public void recordNoKeyCompactedTopic() {
+                allTopicsStats.noKeyCompactedTopicRecordsPerSec().mark();
+            }
+        };
+    }
 }

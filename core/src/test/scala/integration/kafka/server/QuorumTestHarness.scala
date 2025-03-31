@@ -17,7 +17,10 @@
 
 package kafka.server
 
+import io.aiven.inkless.test_utils.{InklessPostgreSQLContainer, MinioContainer, PostgreSQLTestContainer, S3TestContainer}
 import kafka.controller.ControllerEventManager
+import kafka.server.QuorumTestHarness.{minioContainer, pgContainer}
+import kafka.utils.TestUtils.InklessMode
 
 import java.io.File
 import java.net.InetSocketAddress
@@ -310,11 +313,9 @@ abstract class QuorumTestHarness extends Logging {
       inklessMode.foreach(mode => mode.inklessControlPlaneConfig(props))
     }
 
-    info(s"Running KRAFT test $name")
-    implementation = newKRaftQuorum(testInfo, props)
     if (TestInfoUtils.isKRaft(testInfo)) {
       info(s"Running KRAFT test $name")
-      implementation = newKRaftQuorum(testInfo, baseProps())
+      implementation = newKRaftQuorum(testInfo, props)
     } else {
       info(s"Running ZK test $name")
       implementation = newZooKeeperQuorum()

@@ -47,7 +47,7 @@ import java.util.concurrent.CompletableFuture;
 
 import io.aiven.inkless.TimeUtils;
 
-import static org.apache.kafka.storage.internals.log.UnifiedLog.newValidatorMetricsRecorder;
+import static io.aiven.inkless.produce.UnifiedLog.newValidatorMetricsRecorder;
 
 /**
  * An active file.

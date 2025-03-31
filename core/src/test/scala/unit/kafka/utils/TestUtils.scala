@@ -18,7 +18,7 @@ package kafka.utils
 
 import com.yammer.metrics.core.{Histogram, Meter}
 import io.aiven.inkless.test_utils.{InklessPostgreSQLContainer, MinioContainer}
-import kafka.log.LogManager
+import kafka.log.{LogManager, UnifiedLog}
 import kafka.network.RequestChannel
 import kafka.security.JaasTestUtils
 import kafka.server._
