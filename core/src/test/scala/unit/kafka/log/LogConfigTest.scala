@@ -453,12 +453,13 @@ class LogConfigTest {
     val kafkaProps = TestUtils.createDummyBrokerConfig()
     val logProps = new Properties
     logProps.put(TopicConfig.INKLESS_ENABLE_CONFIG, enable.toString)
+    val kafkaConfig = KafkaConfig.fromProps(kafkaProps)
     // Should be possible to set inkless to true/false at creation time
-    LogConfig.validate(Collections.emptyMap(), logProps, kafkaProps, false, false)
+    LogConfig.validate(Collections.emptyMap(), logProps, kafkaConfig.extractLogConfigMap, false)
     // But fail to reset value after creation
     assertThrows(
       classOf[InvalidConfigurationException],
-      () => LogConfig.validate(Collections.singletonMap(TopicConfig.INKLESS_ENABLE_CONFIG, (!enable).toString), logProps, kafkaProps, false, false))
+      () => LogConfig.validate(Collections.singletonMap(TopicConfig.INKLESS_ENABLE_CONFIG, (!enable).toString), logProps, kafkaConfig.extractLogConfigMap, false))
   }
 
   @Test

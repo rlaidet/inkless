@@ -17,7 +17,7 @@
  */
 package io.aiven.inkless.test_utils;
 
-import org.apache.kafka.common.test.TestUtils;
+import org.apache.kafka.test.TestUtils;
 
 import org.junit.jupiter.api.TestInfo;
 import org.slf4j.Logger;

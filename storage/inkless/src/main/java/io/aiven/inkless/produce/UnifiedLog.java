@@ -35,7 +35,6 @@ import org.apache.kafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.utils.PrimitiveRef;
 import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.metadata.LeaderAndIsr;
-import org.apache.kafka.server.common.MetadataVersion;
 import org.apache.kafka.server.common.RequestLocal;
 import org.apache.kafka.server.record.BrokerCompressionType;
 import org.apache.kafka.storage.internals.log.AppendOrigin;
@@ -277,8 +276,7 @@ class UnifiedLog {
                 config.messageTimestampBeforeMaxMs,
                 config.messageTimestampAfterMaxMs,
                 LEADER_EPOCH,
-                APPEND_ORIGIN,
-                MetadataVersion.latestProduction()
+                APPEND_ORIGIN
             );
             LogValidator.ValidationResult validateAndOffsetAssignResult = validator.validateMessagesAndAssignOffsets(
                 offset,

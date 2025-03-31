@@ -17,7 +17,7 @@
  */
 package io.aiven.inkless.test_utils;
 
-import org.apache.kafka.common.test.TestUtils;
+import org.apache.kafka.test.TestUtils;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
