@@ -49,7 +49,7 @@ class ProducerCompressionTest extends QuorumTestHarness {
   @BeforeEach
   override def setUp(testInfo: TestInfo): Unit = {
     super.setUp(testInfo)
-    val props = TestUtils.createBrokerConfig(brokerId, zkConnectOrNull, inklessMode = inklessMode)
+    val props = TestUtils.createBrokerConfig(brokerId, inklessMode = inklessMode)
     broker = createBroker(new KafkaConfig(props))
   }
 

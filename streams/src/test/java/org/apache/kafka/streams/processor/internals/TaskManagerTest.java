@@ -55,7 +55,7 @@ import org.apache.kafka.streams.processor.internals.tasks.DefaultTaskManager;
 import org.apache.kafka.streams.processor.internals.testutil.DummyStreamsConfig;
 import org.apache.kafka.streams.state.internals.OffsetCheckpoint;
 
-import org.apache.log4j.Level;
+import org.apache.logging.log4j.Level;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -3057,12 +3057,80 @@ public class TaskManagerTest {
 
         assertThat(task00.commitNeeded, is(false));
         assertThat(task00.commitPrepared, is(true));
-        assertThat(task00.commitNeeded, is(false));
+        assertThat(task01.commitNeeded, is(false));
         assertThat(task01.commitPrepared, is(true));
         assertThat(task02.commitPrepared, is(false));
         assertThat(task10.commitPrepared, is(false));
 
         verify(consumer).commitSync(expectedCommittedOffsets);
+    }
+
+    @Test
+    public void shouldNotCommitIfNoRevokedTasksNeedCommitting() {
+        final StateMachineTask task00 = new StateMachineTask(taskId00, taskId00Partitions, true, stateManager);
+
+        final StateMachineTask task01 = new StateMachineTask(taskId01, taskId01Partitions, true, stateManager);
+        task01.setCommitNeeded();
+
+        final StateMachineTask task02 = new StateMachineTask(taskId02, taskId02Partitions, true, stateManager);
+
+        final Map<TaskId, Set<TopicPartition>> assignmentActive = mkMap(
+            mkEntry(taskId00, taskId00Partitions),
+            mkEntry(taskId01, taskId01Partitions),
+            mkEntry(taskId02, taskId02Partitions)
+        );
+
+        when(consumer.assignment()).thenReturn(assignment);
+
+        when(activeTaskCreator.createTasks(any(), eq(assignmentActive)))
+            .thenReturn(asList(task00, task01, task02));
+
+        taskManager.handleAssignment(assignmentActive, Collections.emptyMap());
+        assertThat(taskManager.tryToCompleteRestoration(time.milliseconds(), null), is(true));
+        assertThat(task00.state(), is(Task.State.RUNNING));
+        assertThat(task01.state(), is(Task.State.RUNNING));
+        assertThat(task02.state(), is(Task.State.RUNNING));
+
+        taskManager.handleRevocation(taskId00Partitions);
+
+        assertThat(task00.commitPrepared, is(false));
+        assertThat(task01.commitPrepared, is(false));
+        assertThat(task02.commitPrepared, is(false));
+    }
+
+    @Test
+    public void shouldNotCommitIfNoRevokedTasksNeedCommittingWithEOSv2() {
+        final TaskManager taskManager = setUpTaskManager(ProcessingMode.EXACTLY_ONCE_V2, false);
+
+        final StateMachineTask task00 = new StateMachineTask(taskId00, taskId00Partitions, true, stateManager);
+
+        final StateMachineTask task01 = new StateMachineTask(taskId01, taskId01Partitions, true, stateManager);
+        task01.setCommitNeeded();
+
+        final StateMachineTask task02 = new StateMachineTask(taskId02, taskId02Partitions, true, stateManager);
+
+        final Map<TaskId, Set<TopicPartition>> assignmentActive = mkMap(
+            mkEntry(taskId00, taskId00Partitions),
+            mkEntry(taskId01, taskId01Partitions),
+            mkEntry(taskId02, taskId02Partitions)
+        );
+
+        when(consumer.assignment()).thenReturn(assignment);
+
+        when(activeTaskCreator.createTasks(any(), eq(assignmentActive)))
+            .thenReturn(asList(task00, task01, task02));
+
+        taskManager.handleAssignment(assignmentActive, Collections.emptyMap());
+        assertThat(taskManager.tryToCompleteRestoration(time.milliseconds(), null), is(true));
+        assertThat(task00.state(), is(Task.State.RUNNING));
+        assertThat(task01.state(), is(Task.State.RUNNING));
+        assertThat(task02.state(), is(Task.State.RUNNING));
+
+        taskManager.handleRevocation(taskId00Partitions);
+
+        assertThat(task00.commitPrepared, is(false));
+        assertThat(task01.commitPrepared, is(false));
+        assertThat(task02.commitPrepared, is(false));
     }
 
     @Test
@@ -4650,126 +4718,6 @@ public class TaskManagerTest {
         topologyMetadata.pauseTopology(UNNAMED_TOPOLOGY);
 
         assertEquals(taskManager.notPausedTasks().size(), 0);
-    }
-
-    @Test
-    public void shouldRecycleStartupTasksFromStateDirectoryAsActive() {
-        final StandbyTask startupTask = standbyTask(taskId00, taskId00ChangelogPartitions).build();
-        final StreamTask activeTask = statefulTask(taskId00, taskId00ChangelogPartitions).build();
-        when(activeTaskCreator.createActiveTaskFromStandby(eq(startupTask), eq(taskId00Partitions), any()))
-            .thenReturn(activeTask);
-
-        when(stateDirectory.hasStartupTasks()).thenReturn(true, false);
-        when(stateDirectory.removeStartupTask(taskId00)).thenReturn(startupTask, (Task) null);
-
-        taskManager.handleAssignment(taskId00Assignment, Collections.emptyMap());
-
-        // ensure we recycled our existing startup Standby into an Active task
-        verify(activeTaskCreator).createActiveTaskFromStandby(eq(startupTask), eq(taskId00Partitions), any());
-
-        // ensure we didn't construct any new Tasks
-        verify(activeTaskCreator).createTasks(any(), eq(Collections.emptyMap()));
-        verify(standbyTaskCreator).createTasks(Collections.emptyMap());
-        verifyNoMoreInteractions(activeTaskCreator);
-        verifyNoMoreInteractions(standbyTaskCreator);
-
-        // verify the recycled task is now being used as an assiged Active
-        assertEquals(Collections.singletonMap(taskId00, activeTask), taskManager.activeTaskMap());
-        assertEquals(Collections.emptyMap(), taskManager.standbyTaskMap());
-    }
-
-    @Test
-    public void shouldUseStartupTasksFromStateDirectoryAsStandby() {
-        final StandbyTask startupTask = standbyTask(taskId00, taskId00ChangelogPartitions).build();
-
-        when(stateDirectory.hasStartupTasks()).thenReturn(true, true, false);
-        when(stateDirectory.removeStartupTask(taskId00)).thenReturn(startupTask, (Task) null);
-
-        taskManager.handleAssignment(Collections.emptyMap(), taskId00Assignment);
-
-        // ensure we used our existing startup Task directly as a Standby
-        verify(startupTask).resume();
-
-        // ensure we didn't construct any new Tasks, or recycle an existing Task; we only used the one we already have
-        verify(activeTaskCreator).createTasks(any(), eq(Collections.emptyMap()));
-        verify(standbyTaskCreator).createTasks(Collections.emptyMap());
-        verifyNoMoreInteractions(activeTaskCreator);
-        verifyNoMoreInteractions(standbyTaskCreator);
-
-        // verify the startup Standby is now being used as an assigned Standby
-        assertEquals(Collections.emptyMap(), taskManager.activeTaskMap());
-        assertEquals(Collections.singletonMap(taskId00, startupTask), taskManager.standbyTaskMap());
-    }
-
-    @Test
-    public void shouldRecycleStartupTasksFromStateDirectoryAsActiveWithStateUpdater() {
-        final Tasks taskRegistry = new Tasks(new LogContext());
-        final TaskManager taskManager = setUpTaskManager(ProcessingMode.AT_LEAST_ONCE, taskRegistry, true);
-        final StandbyTask startupTask = standbyTask(taskId00, taskId00ChangelogPartitions).build();
-
-        final StreamTask activeTask = statefulTask(taskId00, taskId00ChangelogPartitions).build();
-        when(activeTaskCreator.createActiveTaskFromStandby(eq(startupTask), eq(taskId00Partitions), any()))
-                .thenReturn(activeTask);
-
-        when(stateDirectory.hasStartupTasks()).thenReturn(true, false);
-        when(stateDirectory.removeStartupTask(taskId00)).thenReturn(startupTask, (Task) null);
-
-        taskManager.handleAssignment(taskId00Assignment, Collections.emptyMap());
-
-        // ensure we used our existing startup Task directly as a Standby
-        assertTrue(taskRegistry.hasPendingTasksToInit());
-        assertEquals(Collections.singleton(activeTask), taskRegistry.drainPendingTasksToInit());
-
-        // we're using a mock StateUpdater here, so now that we've drained the task from the queue of startup tasks to init
-        // let's "add" it to our mock StateUpdater
-        when(stateUpdater.tasks()).thenReturn(Collections.singleton(activeTask));
-        when(stateUpdater.standbyTasks()).thenReturn(Collections.emptySet());
-
-        // ensure we recycled our existing startup Standby into an Active task
-        verify(activeTaskCreator).createActiveTaskFromStandby(eq(startupTask), eq(taskId00Partitions), any());
-
-        // ensure we didn't construct any new Tasks
-        verify(activeTaskCreator).createTasks(any(), eq(Collections.emptyMap()));
-        verify(standbyTaskCreator).createTasks(Collections.emptyMap());
-        verifyNoMoreInteractions(activeTaskCreator);
-        verifyNoMoreInteractions(standbyTaskCreator);
-
-        // verify the recycled task is now being used as an assiged Active
-        assertEquals(Collections.singletonMap(taskId00, activeTask), taskManager.activeTaskMap());
-        assertEquals(Collections.emptyMap(), taskManager.standbyTaskMap());
-    }
-
-    @Test
-    public void shouldUseStartupTasksFromStateDirectoryAsStandbyWithStateUpdater() {
-        final Tasks taskRegistry = new Tasks(new LogContext());
-        final TaskManager taskManager = setUpTaskManager(ProcessingMode.AT_LEAST_ONCE, taskRegistry, true);
-        final StandbyTask startupTask = standbyTask(taskId00, taskId00ChangelogPartitions).build();
-
-        when(stateDirectory.hasStartupTasks()).thenReturn(true, true, false);
-        when(stateDirectory.removeStartupTask(taskId00)).thenReturn(startupTask, (Task) null);
-
-        assertFalse(taskRegistry.hasPendingTasksToInit());
-
-        taskManager.handleAssignment(Collections.emptyMap(), taskId00Assignment);
-
-        // ensure we used our existing startup Task directly as a Standby
-        assertTrue(taskRegistry.hasPendingTasksToInit());
-        assertEquals(Collections.singleton(startupTask), taskRegistry.drainPendingTasksToInit());
-
-        // we're using a mock StateUpdater here, so now that we've drained the task from the queue of startup tasks to init
-        // let's "add" it to our mock StateUpdater
-        when(stateUpdater.tasks()).thenReturn(Collections.singleton(startupTask));
-        when(stateUpdater.standbyTasks()).thenReturn(Collections.singleton(startupTask));
-
-        // ensure we didn't construct any new Tasks, or recycle an existing Task; we only used the one we already have
-        verify(activeTaskCreator).createTasks(any(), eq(Collections.emptyMap()));
-        verify(standbyTaskCreator).createTasks(Collections.emptyMap());
-        verifyNoMoreInteractions(activeTaskCreator);
-        verifyNoMoreInteractions(standbyTaskCreator);
-
-        // verify the startup Standby is now being used as an assigned Standby
-        assertEquals(Collections.emptyMap(), taskManager.activeTaskMap());
-        assertEquals(Collections.singletonMap(taskId00, startupTask), taskManager.standbyTaskMap());
     }
 
     private static KafkaFutureImpl<DeletedRecords> completedFuture() {

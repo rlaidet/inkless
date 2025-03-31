@@ -90,6 +90,7 @@ import org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetrics;
 import org.apache.kafka.coordinator.group.metrics.GroupCoordinatorMetricsShard;
 import org.apache.kafka.image.MetadataDelta;
 import org.apache.kafka.image.MetadataImage;
+import org.apache.kafka.server.authorizer.Authorizer;
 import org.apache.kafka.server.common.ApiMessageAndVersion;
 import org.apache.kafka.timeline.SnapshotRegistry;
 
@@ -98,6 +99,7 @@ import org.slf4j.Logger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -125,6 +127,7 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
         private CoordinatorExecutor<CoordinatorRecord> executor;
         private CoordinatorMetrics coordinatorMetrics;
         private TopicPartition topicPartition;
+        private Optional<Authorizer> authorizer;
 
         public Builder(
             GroupCoordinatorConfig config,
@@ -188,6 +191,13 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
             return this;
         }
 
+        public CoordinatorShardBuilder<GroupCoordinatorShard, CoordinatorRecord> withAuthorizer(
+            Optional<Authorizer> authorizer
+        ) {
+            this.authorizer = authorizer;
+            return this;
+        }
+
         @SuppressWarnings("NPathComplexity")
         @Override
         public GroupCoordinatorShard build() {
@@ -208,6 +218,8 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
                 throw new IllegalArgumentException("TopicPartition must be set.");
             if (groupConfigManager == null)
                 throw new IllegalArgumentException("GroupConfigManager must be set.");
+            if (authorizer == null)
+                throw new IllegalArgumentException("Authorizer must be set.");
 
             GroupCoordinatorMetricsShard metricsShard = ((GroupCoordinatorMetrics) coordinatorMetrics)
                 .newMetricsShard(snapshotRegistry, topicPartition);
@@ -217,21 +229,11 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
                 .withSnapshotRegistry(snapshotRegistry)
                 .withTime(time)
                 .withTimer(timer)
+                .withExecutor(executor)
+                .withConfig(config)
                 .withGroupConfigManager(groupConfigManager)
-                .withConsumerGroupAssignors(config.consumerGroupAssignors())
-                .withConsumerGroupMaxSize(config.consumerGroupMaxSize())
-                .withConsumerGroupSessionTimeout(config.consumerGroupSessionTimeoutMs())
-                .withConsumerGroupHeartbeatInterval(config.consumerGroupHeartbeatIntervalMs())
-                .withClassicGroupMaxSize(config.classicGroupMaxSize())
-                .withClassicGroupInitialRebalanceDelayMs(config.classicGroupInitialRebalanceDelayMs())
-                .withClassicGroupNewMemberJoinTimeoutMs(config.classicGroupNewMemberJoinTimeoutMs())
-                .withClassicGroupMinSessionTimeoutMs(config.classicGroupMinSessionTimeoutMs())
-                .withClassicGroupMaxSessionTimeoutMs(config.classicGroupMaxSessionTimeoutMs())
-                .withConsumerGroupMigrationPolicy(config.consumerGroupMigrationPolicy())
-                .withShareGroupMaxSize(config.shareGroupMaxSize())
-                .withShareGroupSessionTimeout(config.shareGroupSessionTimeoutMs())
-                .withShareGroupHeartbeatInterval(config.shareGroupHeartbeatIntervalMs())
                 .withGroupCoordinatorMetricsShard(metricsShard)
+                .withAuthorizer(authorizer)
                 .build();
 
             OffsetMetadataManager offsetMetadataManager = new OffsetMetadataManager.Builder()
@@ -264,11 +266,11 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     static final String GROUP_EXPIRATION_KEY = "expire-group-metadata";
 
     /**
-     * The classic group size counter key to schedule a timer task.
+     * The classic and consumer group size counter key to schedule a timer task.
      *
      * Visible for testing.
      */
-    static final String CLASSIC_GROUP_SIZE_COUNTER_KEY = "classic-group-size-counter";
+    static final String GROUP_SIZE_COUNTER_KEY = "group-size-counter";
 
     /**
      * Hardcoded default value of the interval to update the classic group size counter.
@@ -614,7 +616,7 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
         List<String> groupIds,
         long committedOffset
     ) {
-        return groupMetadataManager.describeGroups(groupIds, committedOffset);
+        return groupMetadataManager.describeGroups(context, groupIds, committedOffset);
     }
 
     /**
@@ -665,8 +667,11 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
             }
         });
 
-        log.info("Generated {} tombstone records while cleaning up group metadata in {} milliseconds.",
-            records.size(), time.milliseconds() - startMs);
+        if (!records.isEmpty()) {
+            log.info("Generated {} tombstone records while cleaning up group metadata in {} milliseconds.",
+                records.size(), time.milliseconds() - startMs);
+        }
+
         // Reschedule the next cycle.
         scheduleGroupMetadataExpiration();
         return new CoordinatorResult<>(records, false);
@@ -705,27 +710,27 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     }
 
     /**
-     * Schedules (or reschedules) the group size counter for the classic groups.
+     * Schedules (or reschedules) the group size counter for the classic/consumer groups.
      */
-    private void scheduleClassicGroupSizeCounter() {
+    private void scheduleGroupSizeCounter() {
         timer.schedule(
-            CLASSIC_GROUP_SIZE_COUNTER_KEY,
+            GROUP_SIZE_COUNTER_KEY,
             DEFAULT_GROUP_GAUGES_UPDATE_INTERVAL_MS,
             TimeUnit.MILLISECONDS,
             true,
             () -> {
-                groupMetadataManager.updateClassicGroupSizeCounter();
-                scheduleClassicGroupSizeCounter();
+                groupMetadataManager.updateGroupSizeCounter();
+                scheduleGroupSizeCounter();
                 return GroupMetadataManager.EMPTY_RESULT;
             }
         );
     }
 
     /**
-     * Cancels the group size counter for the classic groups.
+     * Cancels the group size counter for the classic/consumer groups.
      */
-    private void cancelClassicGroupSizeCounter() {
-        timer.cancel(CLASSIC_GROUP_SIZE_COUNTER_KEY);
+    private void cancelGroupSizeCounter() {
+        timer.cancel(GROUP_SIZE_COUNTER_KEY);
     }
 
     /**
@@ -738,12 +743,11 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     public void onLoaded(MetadataImage newImage) {
         MetadataDelta emptyDelta = new MetadataDelta(newImage);
         groupMetadataManager.onNewMetadataImage(newImage, emptyDelta);
-        offsetMetadataManager.onNewMetadataImage(newImage, emptyDelta);
         coordinatorMetrics.activateMetricsShard(metricsShard);
 
         groupMetadataManager.onLoaded();
         scheduleGroupMetadataExpiration();
-        scheduleClassicGroupSizeCounter();
+        scheduleGroupSizeCounter();
     }
 
     @Override
@@ -751,7 +755,7 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
         timer.cancel(GROUP_EXPIRATION_KEY);
         coordinatorMetrics.deactivateMetricsShard(metricsShard);
         groupMetadataManager.onUnloaded();
-        cancelClassicGroupSizeCounter();
+        cancelGroupSizeCounter();
     }
 
     /**
@@ -763,7 +767,6 @@ public class GroupCoordinatorShard implements CoordinatorShard<CoordinatorRecord
     @Override
     public void onNewMetadataImage(MetadataImage newImage, MetadataDelta delta) {
         groupMetadataManager.onNewMetadataImage(newImage, delta);
-        offsetMetadataManager.onNewMetadataImage(newImage, delta);
     }
 
     /**

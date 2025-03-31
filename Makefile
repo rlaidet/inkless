@@ -1,3 +1,6 @@
+.PHONY: all
+all: clean fmt test pitest
+
 .PHONY: local_minio
 local_minio:
 	docker compose up -d minio minio-create_bucket
@@ -66,7 +69,7 @@ pitest:
 
 .PHONY: integration_test
 integration_test_core:
-	./gradlew :core:test --tests "kafka.api.*Producer*Test" --max-workers 1
+	./gradlew :core:test --tests "kafka.api.*" --max-workers 1
 
 .PHONY: clean
 clean:

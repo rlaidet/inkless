@@ -19,7 +19,7 @@ package kafka.server
 
 import io.aiven.inkless.control_plane.ControlPlane
 import kafka.metrics.KafkaMetricsReporter
-import kafka.raft.KafkaRaftManager
+import kafka.raft.{DefaultExternalKRaftMetrics, KafkaRaftManager}
 import kafka.server.Server.MetricsPrefix
 import kafka.utils.{CoreUtils, Logging, VerifiableProperties}
 import org.apache.kafka.common.metrics.Metrics
@@ -271,7 +271,7 @@ class SharedServer(
           // This is only done in tests.
           metrics = new Metrics()
         }
-        sharedServerConfig.dynamicConfig.initialize(zkClientOpt = None, clientMetricsReceiverPluginOpt = None)
+        sharedServerConfig.dynamicConfig.initialize(clientMetricsReceiverPluginOpt = None)
 
         if (sharedServerConfig.processRoles.contains(ProcessRole.BrokerRole)) {
           brokerMetrics = new BrokerServerMetrics(metrics)
@@ -279,6 +279,8 @@ class SharedServer(
         if (sharedServerConfig.processRoles.contains(ProcessRole.ControllerRole)) {
           controllerServerMetrics = new ControllerMetadataMetrics(Optional.of(KafkaYammerMetrics.defaultRegistry()))
         }
+
+        val externalKRaftMetrics = new DefaultExternalKRaftMetrics(Option(brokerMetrics), Option(controllerServerMetrics))
 
         inklessControlPlane = Some(ControlPlane.create(sharedServerConfig.inklessConfig, time))
 
@@ -291,6 +293,7 @@ class SharedServer(
           KafkaRaftServer.MetadataTopicId,
           time,
           metrics,
+          externalKRaftMetrics,
           Some(s"kafka-${sharedServerConfig.nodeId}-raft"), // No dash expected at the end
           controllerQuorumVotersFuture,
           bootstrapServers,

@@ -120,12 +120,7 @@ import java.util.Set;
  * The minimum broker version required is 0.10.0.0. Methods with stricter requirements will specify the minimum broker
  * version required.
  * <p>
- * This client was introduced in 0.11.0.0 and the API is still evolving. We will try to evolve the API in a compatible
- * manner, but we reserve the right to make breaking changes in minor releases, if necessary. We will update the
- * {@code InterfaceStability} annotation and this notice once the API is considered stable.
- * <p>
  */
-@InterfaceStability.Evolving
 public interface Admin extends AutoCloseable {
 
     /**
@@ -485,41 +480,6 @@ public interface Admin extends AutoCloseable {
      * @return The DescribeConfigsResult
      */
     DescribeConfigsResult describeConfigs(Collection<ConfigResource> resources, DescribeConfigsOptions options);
-
-    /**
-     * Update the configuration for the specified resources with the default options.
-     * <p>
-     * This is a convenience method for {@link #alterConfigs(Map, AlterConfigsOptions)} with default options.
-     * See the overload for more details.
-     * <p>
-     * This operation is supported by brokers with version 0.11.0.0 or higher.
-     *
-     * @param configs The resources with their configs (topic is the only resource type with configs that can
-     *                be updated currently)
-     * @return The AlterConfigsResult
-     * @deprecated Since 2.3. Use {@link #incrementalAlterConfigs(Map)}.
-     */
-    @Deprecated
-    default AlterConfigsResult alterConfigs(Map<ConfigResource, Config> configs) {
-        return alterConfigs(configs, new AlterConfigsOptions());
-    }
-
-    /**
-     * Update the configuration for the specified resources with the default options.
-     * <p>
-     * Updates are not transactional so they may succeed for some resources while fail for others. The configs for
-     * a particular resource are updated atomically.
-     * <p>
-     * This operation is supported by brokers with version 0.11.0.0 or higher.
-     *
-     * @param configs The resources with their configs (topic is the only resource type with configs that can
-     *                be updated currently)
-     * @param options The options to use when describing configs
-     * @return The AlterConfigsResult
-     * @deprecated Since 2.3. Use {@link #incrementalAlterConfigs(Map, AlterConfigsOptions)}.
-     */
-    @Deprecated
-    AlterConfigsResult alterConfigs(Map<ConfigResource, Config> configs, AlterConfigsOptions options);
 
     /**
      * Incrementally updates the configuration for the specified resources with default options.
@@ -938,9 +898,7 @@ public interface Admin extends AutoCloseable {
      * @return The ListConsumerGroupOffsetsResult
      */
     default ListConsumerGroupOffsetsResult listConsumerGroupOffsets(String groupId, ListConsumerGroupOffsetsOptions options) {
-        @SuppressWarnings("deprecation")
-        ListConsumerGroupOffsetsSpec groupSpec = new ListConsumerGroupOffsetsSpec()
-            .topicPartitions(options.topicPartitions());
+        ListConsumerGroupOffsetsSpec groupSpec = new ListConsumerGroupOffsetsSpec();
 
         // We can use the provided options with the batched API, which uses topic partitions from
         // the group spec and ignores any topic partitions set in the options.
@@ -1480,14 +1438,23 @@ public interface Admin extends AutoCloseable {
      * error code for each supplied {@link FeatureUpdate}, and the code indicates if the update
      * succeeded or failed in the controller.
      * <ul>
-     * <li>Downgrade of feature version level is not a regular operation/intent. It is only allowed
-     * in the controller if the {@link FeatureUpdate} has the allowDowngrade flag set. Setting this
-     * flag conveys user intent to attempt downgrade of a feature max version level. Note that
-     * despite the allowDowngrade flag being set, certain downgrades may be rejected by the
-     * controller if it is deemed impossible.</li>
-     * <li>Deletion of a finalized feature version is not a regular operation/intent. It could be
-     * done by setting the allowDowngrade flag to true in the {@link FeatureUpdate}, and, setting
-     * the max version level to a value less than 1.</li>
+     * <li>Downgrading a feature version level is not a common operation and should only be
+     * performed when necessary. It is permitted only if the {@link FeatureUpdate} specifies the
+     * {@code upgradeType} as either {@link FeatureUpdate.UpgradeType#SAFE_DOWNGRADE} or
+     * {@link FeatureUpdate.UpgradeType#UNSAFE_DOWNGRADE}.
+     * <ul>
+     * <li>{@code SAFE_DOWNGRADE}: Allows downgrades that do not lead to metadata loss.</li>
+     * <li>{@code UNSAFE_DOWNGRADE}: Permits downgrades that might result in metadata loss.</li>
+     * </ul>
+     * Note that even with these settings, certain downgrades may still be rejected by the controller
+     * if they are considered unsafe or impossible.</li>
+     * <li>Deleting a finalized feature version is also not a common operation. To delete a feature,
+     * set the {@code maxVersionLevel} to zero and specify the {@code upgradeType} as either
+     * {@link FeatureUpdate.UpgradeType#SAFE_DOWNGRADE} or
+     * {@link FeatureUpdate.UpgradeType#UNSAFE_DOWNGRADE}.</li>
+     * <li>The {@link FeatureUpdate.UpgradeType#UPGRADE} type cannot be used when the
+     * {@code maxVersionLevel} is zero. Attempting to do so will result in an
+     * {@link IllegalArgumentException}.</li>
      * </ul>
      * <p>
      * The following exceptions can be anticipated when calling {@code get()} on the futures
@@ -1548,8 +1515,7 @@ public interface Admin extends AutoCloseable {
     /**
      * Unregister a broker.
      * <p>
-     * This operation does not have any effect on partition assignments. It is supported
-     * only on Kafka clusters which use Raft to store metadata, rather than ZooKeeper.
+     * This operation does not have any effect on partition assignments.
      *
      * This is a convenience method for {@link #unregisterBroker(int, UnregisterBrokerOptions)}
      *
@@ -1565,8 +1531,7 @@ public interface Admin extends AutoCloseable {
     /**
      * Unregister a broker.
      * <p>
-     * This operation does not have any effect on partition assignments. It is supported
-     * only on Kafka clusters which use Raft to store metadata, rather than ZooKeeper.
+     * This operation does not have any effect on partition assignments.
      *
      * The following exceptions can be anticipated when calling {@code get()} on the future from the
      * returned {@link UnregisterBrokerResult}:
@@ -1574,8 +1539,7 @@ public interface Admin extends AutoCloseable {
      *   <li>{@link org.apache.kafka.common.errors.TimeoutException}
      *   If the request timed out before the describe operation could finish.</li>
      *   <li>{@link org.apache.kafka.common.errors.UnsupportedVersionException}
-     *   If the software is too old to support the unregistration API, or if the
-     *   cluster is not using Raft to store metadata.
+     *   If the software is too old to support the unregistration API.
      * </ul>
      * <p>
      *
@@ -1822,26 +1786,6 @@ public interface Admin extends AutoCloseable {
      */
     default DescribeShareGroupsResult describeShareGroups(Collection<String> groupIds) {
         return describeShareGroups(groupIds, new DescribeShareGroupsOptions());
-    }
-
-    /**
-     * List the share groups available in the cluster.
-     *
-     * @param options The options to use when listing the share groups.
-     * @return The ListShareGroupsResult.
-     */
-    ListShareGroupsResult listShareGroups(ListShareGroupsOptions options);
-
-    /**
-     * List the share groups available in the cluster with the default options.
-     * <p>
-     * This is a convenience method for {@link #listShareGroups(ListShareGroupsOptions)} with default options.
-     * See the overload for more details.
-     *
-     * @return The ListShareGroupsResult.
-     */
-    default ListShareGroupsResult listShareGroups() {
-        return listShareGroups(new ListShareGroupsOptions());
     }
 
     /**
