@@ -1704,11 +1704,16 @@ class KafkaApis(val requestChannel: RequestChannel,
 
       val currentErrors = new ConcurrentHashMap[TopicPartition, Errors]()
       marker.partitions.forEach { partition =>
-        replicaManager.onlinePartition(partition) match {
-          case Some(_)  =>
-            partitionsWithCompatibleMessageFormat += partition
-          case None =>
-            currentErrors.put(partition, Errors.UNKNOWN_TOPIC_OR_PARTITION)
+        if (inklessSharedState.exists(s => s.metadata().isInklessTopic(partition.topic()))) {
+          warn("Attempt to call WriteTxnMarkersRequest with Inkless topic")
+          currentErrors.put(partition, Errors.INVALID_TOPIC_EXCEPTION)
+        } else {
+          replicaManager.onlinePartition(partition) match {
+            case Some(_) =>
+              partitionsWithCompatibleMessageFormat += partition
+            case None =>
+              currentErrors.put(partition, Errors.UNKNOWN_TOPIC_OR_PARTITION)
+          }
         }
       }
 
@@ -1865,9 +1870,10 @@ class KafkaApis(val requestChannel: RequestChannel,
             unauthorizedTopicErrors += topicPartition -> Errors.TOPIC_AUTHORIZATION_FAILED
           else if (!metadataCache.contains(topicPartition))
             nonExistingTopicErrors += topicPartition -> Errors.UNKNOWN_TOPIC_OR_PARTITION
-          else if (inklessSharedState.exists(s => s.metadata().isInklessTopic(topicPartition.topic)))
+          else if (inklessSharedState.exists(s => s.metadata().isInklessTopic(topicPartition.topic))) {
+            warn("Attempt to call AddPartitionsToTxnRequest with Inkless topic")
             prohibitedInklessTopicErrors += topicPartition -> Errors.INVALID_TOPIC_EXCEPTION
-          else
+          } else
             authorizedPartitions.add(topicPartition)
         }
 
