@@ -1634,7 +1634,7 @@ public class ReplicationControlManager {
             .setEligibleLeaderReplicasEnabled(featureControl.isElrFeatureEnabled())
             .setDefaultDirProvider(clusterDescriber)
             .build();
-        if (!record.isPresent()) {
+        if (record.isEmpty()) {
             if (electionType == ElectionType.PREFERRED) {
                 return new ApiError(Errors.PREFERRED_LEADER_NOT_AVAILABLE);
             } else {
@@ -1715,7 +1715,7 @@ public class ReplicationControlManager {
     ControllerResult<Boolean> maybeFenceOneStaleBroker() {
         BrokerHeartbeatManager heartbeatManager = clusterControl.heartbeatManager();
         Optional<BrokerIdAndEpoch> idAndEpoch = heartbeatManager.tracker().maybeRemoveExpired();
-        if (!idAndEpoch.isPresent()) {
+        if (idAndEpoch.isEmpty()) {
             log.debug("No stale brokers found.");
             return ControllerResult.of(Collections.emptyList(), false);
         }
@@ -1816,7 +1816,7 @@ public class ReplicationControlManager {
     }
 
     /**
-     * Trigger unclean leader election for partitions without leader (visiable for testing)
+     * Trigger unclean leader election for partitions without leader (visible for testing)
      *
      * @param records       The record list to append to.
      * @param maxElections  The maximum number of elections to perform.
@@ -2106,14 +2106,13 @@ public class ReplicationControlManager {
                 new AlterPartitionReassignmentsResponseData().setErrorMessage(null);
         int successfulAlterations = 0, totalAlterations = 0;
         for (ReassignableTopic topic : request.topics()) {
-            boolean effectiveRFChange = allowRFChange
-                && !Boolean.parseBoolean(configurationControl.currentTopicConfig(topic.name()).getOrDefault(INKLESS_ENABLE_CONFIG, "false"));
+            boolean effectiveRFChange = !Boolean.parseBoolean(configurationControl.currentTopicConfig(topic.name()).getOrDefault(INKLESS_ENABLE_CONFIG, "false"));
             ReassignableTopicResponse topicResponse = new ReassignableTopicResponse().
                 setName(topic.name());
             for (ReassignablePartition partition : topic.partitions()) {
                 ApiError error = ApiError.NONE;
                 try {
-                    alterPartitionReassignment(topic.name(), partition, records);
+                    alterPartitionReassignment(topic.name(), partition, records, effectiveRFChange);
                     successfulAlterations++;
                 } catch (Throwable e) {
                     log.info("Unable to alter partition reassignment for " +
@@ -2136,7 +2135,8 @@ public class ReplicationControlManager {
 
     void alterPartitionReassignment(String topicName,
                                     ReassignablePartition target,
-                                    List<ApiMessageAndVersion> records) {
+                                    List<ApiMessageAndVersion> records,
+                                    boolean allowRFChange) {
         Uuid topicId = topicsByName.get(topicName);
         if (topicId == null) {
             throw new UnknownTopicOrPartitionException("Unable to find a topic " +
@@ -2157,7 +2157,7 @@ public class ReplicationControlManager {
         if (target.replicas() == null) {
             record = cancelPartitionReassignment(topicName, tp, part);
         } else {
-            record = changePartitionReassignment(tp, part, target);
+            record = changePartitionReassignment(tp, part, target, allowRFChange);
         }
         record.ifPresent(records::add);
     }
@@ -2221,18 +2221,23 @@ public class ReplicationControlManager {
      * @param tp                The topic id and partition id.
      * @param part              The existing partition info.
      * @param target            The target partition info.
+     * @param allowRFChange     Validate if partition replication factor can change. KIP-860
      *
      * @return                  The ChangePartitionRecord for the new partition assignment,
      *                          or empty if no change is needed.
      */
     Optional<ApiMessageAndVersion> changePartitionReassignment(TopicIdPartition tp,
                                                                PartitionRegistration part,
-                                                               ReassignablePartition target) {
+                                                               ReassignablePartition target,
+                                                               boolean allowRFChange) {
         // Check that the requested partition assignment is valid.
         PartitionAssignment currentAssignment = new PartitionAssignment(Replicas.toList(part.replicas), part::directory);
         PartitionAssignment targetAssignment = new PartitionAssignment(target.replicas(), clusterDescriber);
 
         validateManualPartitionAssignment(targetAssignment, OptionalInt.empty());
+        if (!allowRFChange) {
+            validatePartitionReplicationFactorUnchanged(part, target);
+        }
 
         List<Integer> currentReplicas = Replicas.toList(part.replicas);
         PartitionReassignmentReplicas reassignment =
@@ -2450,6 +2455,30 @@ public class ReplicationControlManager {
             newPartInfo.isr, prevPartInfo == null ? NO_LEADER : prevPartInfo.leader, newPartInfo.leader);
         brokersToElrs.update(topicId, partitionId, prevPartInfo == null ? null : prevPartInfo.elr,
             newPartInfo.elr);
+    }
+
+    private void validatePartitionReplicationFactorUnchanged(PartitionRegistration part,
+                                                             ReassignablePartition target) {
+        int currentReassignmentSetSize;
+        if (isReassignmentInProgress(part)) {
+            Set<Integer> set = new HashSet<>();
+            for (int r : part.replicas) {
+                set.add(r);
+            }
+            for (int r : part.addingReplicas) {
+                set.add(r);
+            }
+            for (int r : part.removingReplicas) {
+                set.remove(r);
+            }
+            currentReassignmentSetSize = set.size();
+        } else {
+            currentReassignmentSetSize = part.replicas.length;
+        }
+        if (currentReassignmentSetSize != target.replicas().size()) {
+            throw new InvalidReplicationFactorException("The replication factor is changed from " +
+                    currentReassignmentSetSize + " to " + target.replicas().size());
+        }
     }
 
     private static final class IneligibleReplica {
