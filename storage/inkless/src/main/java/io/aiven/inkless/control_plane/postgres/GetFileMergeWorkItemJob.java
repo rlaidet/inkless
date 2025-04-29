@@ -117,11 +117,7 @@ public class GetFileMergeWorkItemJob implements Callable<FileMergeWorkItem> {
                                                 m.getLastOffset(),
                                                 m.getLogAppendTimestamp(),
                                                 m.getBatchMaxTimestamp(),
-                                                m.getTimestampType(),
-                                                m.getProducerId(),
-                                                m.getProducerEpoch(),
-                                                m.getBaseSequence(),
-                                                m.getLastSequence()
+                                                m.getTimestampType()
                                             )
                                         );
                                     }
