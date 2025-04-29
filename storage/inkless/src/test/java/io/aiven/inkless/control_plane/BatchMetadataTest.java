@@ -43,11 +43,7 @@ class BatchMetadataTest {
             11,
             0,
             0,
-            TimestampType.CREATE_TIME,
-            -1,
-            (short) -1,
-            -1,
-            -1
+            TimestampType.CREATE_TIME
         );
         assertThat(batchMetadata.range().size()).isEqualTo(10);
     }
@@ -63,11 +59,7 @@ class BatchMetadataTest {
             0,
             0,
             0,
-            TimestampType.CREATE_TIME,
-            -1,
-            (short) -1,
-            -1,
-            -1
+            TimestampType.CREATE_TIME
         )).isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Invalid record offsets, last cannot be less than base: base=10, last=0");
     }
