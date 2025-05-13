@@ -61,7 +61,12 @@ docker_build: build_release docker_build_prep
 	cp -R core/build/distributions docker/resources/.
 	# use existing docker tooling to build image
 	cd docker && \
-	  .venv/bin/python3 docker_build_test.py -b kafka/test --image-tag=$(VERSION) --image-type=inkless
+	  .venv/bin/python3 docker_build_test.py -b aivenoy/kafka --image-tag=$(VERSION) --image-type=inkless
+
+.PHONY: docker_push
+docker_push: docker_build
+	# use existing docker tooling to push image
+	docker push aivenoy/kafka:$(VERSION)
 
 .PHONY: fmt
 fmt:
@@ -88,7 +93,7 @@ clean:
 	./gradlew clean
 
 .PHONY: demo
-demo: core/build/distributions/kafka_2.13-$(VERSION)
+demo:
 	docker compose -f docker-compose-demo.yml up
 	docker compose -f docker-compose-demo.yml down --remove-orphans
 
