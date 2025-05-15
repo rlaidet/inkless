@@ -120,7 +120,7 @@ trait MetadataCache {
 
   def features(): FinalizedFeatures
 
-  def isInklessTopic(topic: String, defaultConfig: Supplier[Map[_, _]]): Boolean
+  def isInklessTopic(topic: String, defaultConfig: Supplier[Map[String, _]]): Boolean
 }
 
 object MetadataCache {
