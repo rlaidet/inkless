@@ -400,6 +400,7 @@ BEGIN
         FROM logs
         WHERE topic_id = l_request.topic_id
             AND partition = l_request.partition
+        ORDER BY topic_id, partition  -- ordering is important to prevent deadlocks
         FOR UPDATE
         INTO l_log;
 
@@ -858,6 +859,18 @@ BEGIN
             RETURN ROW('invalid_parent_batch_count'::commit_file_merge_work_item_error_v1, l_merge_file_batch)::commit_file_merge_work_item_response_v1;
         END IF;
     END LOOP;
+
+    -- Lock logs to prevent concurrent modifications.
+    PERFORM
+    FROM logs
+    WHERE (topic_id, partition) IN (
+        SELECT logs.topic_id, logs.partition
+        FROM unnest(arg_merge_file_batches) AS mfb
+             INNER JOIN batches ON mfb.parent_batch_ids[1] = batches.batch_id
+             INNER JOIN logs ON batches.topic_id = logs.topic_id AND batches.partition = logs.partition
+    )
+    ORDER BY topic_id, partition  -- ordering is important to prevent deadlocks
+    FOR UPDATE;
 
     -- filter arg_merge_file_batches to only include the ones where logs exist
     arg_merge_file_batches := ARRAY(
