@@ -1,6 +1,6 @@
 /*
  * Inkless
- * Copyright (C) 2024 - 2025 Aiven OY
+ * Copyright (C) 2025 Aiven OY
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,26 +17,10 @@
  */
 package io.aiven.inkless.control_plane;
 
-import org.apache.kafka.admin.BrokerMetadata;
-import org.apache.kafka.common.TopicIdPartition;
 import org.apache.kafka.common.Uuid;
 
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
-public interface MetadataView {
-    Map<String, Object> getDefaultConfig();
-
-    Iterable<BrokerMetadata> getAliveBrokers();
-
-    Integer getBrokerCount();
-
-    Uuid getTopicId(String topicName);
-
-    boolean isInklessTopic(String topicName);
-
-    Properties getTopicConfig(String topicName);
-
-    Set<TopicIdPartition> getInklessTopicPartitions();
+public record EnforceRetentionRequest(Uuid topicId,
+                                      int partition,
+                                      long retentionBytes,
+                                      long retentionMs) {
 }
