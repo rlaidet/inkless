@@ -23,7 +23,7 @@ import java.util.Properties
 import java.util.concurrent.TimeUnit
 import kafka.integration.KafkaServerTestHarness
 import kafka.security.JaasTestUtils
-import kafka.server.{KafkaConfig, QuorumAndGroupProtocolAndMaybeTopicTypeProvider}
+import kafka.server.{KafkaConfig, GroupProtocolAndMaybeTopicTypeProvider}
 import kafka.utils.{TestInfoUtils, TestUtils}
 import org.apache.kafka.clients.admin.{Admin, NewPartitions}
 import org.apache.kafka.clients.consumer.Consumer

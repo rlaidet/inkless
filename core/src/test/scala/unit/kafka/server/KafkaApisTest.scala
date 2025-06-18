@@ -213,7 +213,7 @@ class KafkaApisTest extends Logging {
       apiVersionManager = apiVersionManager,
       clientMetricsManager = clientMetricsManager,
       groupConfigManager = groupConfigManager,
-      )
+      inklessSharedState = inklessSharedState)
   }
 
   private def setupFeatures(featureVersions: Seq[FeatureVersion]): Unit = {
@@ -2762,24 +2762,22 @@ class KafkaApisTest extends Logging {
 
   @Test
   def testAddPartitionsToTxnWithInklessTopic(): Unit = {
-    val topic = "topic"
+    val topic = "inkless_topic"
     val topicPartition = new TopicPartition(topic, 0)
     addTopicToMetadataCache(topic, numPartitions = 1)
 
     val addPartitionsToTxnRequest = AddPartitionsToTxnRequest.Builder.forClient(
-      "txnlId", 15L, 0.toShort, List(topicPartition).asJava
+      "txnlId", 15L, 0.toShort, util.List.of(topicPartition)
     ).build()
     val request = buildRequest(addPartitionsToTxnRequest)
 
     when(clientRequestQuotaManager.maybeRecordAndGetThrottleTimeMs(any[RequestChannel.Request](),
       any[Long])).thenReturn(0)
-
     val kafkaApis = createKafkaApis(inklessSharedState = Some(createInklessSharedStateWithTopic(topic)))
     try {
       kafkaApis.handleAddPartitionsToTxnRequest(request, RequestLocal.withThreadConfinedCaching)
 
       val response = verifyNoThrottling[AddPartitionsToTxnResponse](request)
-      println(response)
       assertEquals(Errors.INVALID_TOPIC_EXCEPTION, response.errors().get(AddPartitionsToTxnResponse.V3_AND_BELOW_TXN_ID).get(topicPartition))
     } finally {
       kafkaApis.close()
@@ -3166,7 +3164,7 @@ class KafkaApisTest extends Logging {
   def testHandleWriteTxnMarkersRequestWithInklessTopic(): Unit = {
     val topic = "topic"
     val topicPartition = new TopicPartition(topic, 0)
-    val (_, request) = createWriteTxnMarkersRequest(asList(topicPartition))
+    val (_, request) = createWriteTxnMarkersRequest(util.List.of(topicPartition))
     val expectedErrors = Map(topicPartition -> Errors.INVALID_TOPIC_EXCEPTION).asJava
     val capturedResponse: ArgumentCaptor[WriteTxnMarkersResponse] = ArgumentCaptor.forClass(classOf[WriteTxnMarkersResponse])
 

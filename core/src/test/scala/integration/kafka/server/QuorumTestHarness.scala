@@ -463,7 +463,7 @@ import java.util.stream.Stream
 // had to replace with ArgumentsProvider instead to be able to enable inkless at a class level
 // but disable it at a method level.
 // This was not possible with MethodSource as it only has a class level annotation.
-class QuorumAndGroupProtocolAndMaybeTopicTypeProvider extends ArgumentsProvider {
+class GroupProtocolAndMaybeTopicTypeProvider extends ArgumentsProvider {
   override def provideArguments(context: ExtensionContext): Stream[_ <: Arguments] = {
     val hasInklessTag = context.getTestMethod
       .filter(method => method.isAnnotationPresent(classOf[Tag]) &&
@@ -477,15 +477,15 @@ class QuorumAndGroupProtocolAndMaybeTopicTypeProvider extends ArgumentsProvider 
 
     if (hasInklessTag && !hasNoInklessTag) {
       Stream.of(
-        Arguments.of("kraft", GroupProtocol.CLASSIC.name.toLowerCase(Locale.ROOT), "classic"),
-        Arguments.of("kraft", GroupProtocol.CONSUMER.name.toLowerCase(Locale.ROOT), "classic"),
-        Arguments.of("kraft", GroupProtocol.CLASSIC.name.toLowerCase(Locale.ROOT), "inkless"),
-        Arguments.of("kraft", GroupProtocol.CONSUMER.name.toLowerCase(Locale.ROOT), "inkless")
+        Arguments.of(GroupProtocol.CLASSIC.name.toLowerCase(Locale.ROOT), "classic"),
+        Arguments.of(GroupProtocol.CONSUMER.name.toLowerCase(Locale.ROOT), "classic"),
+        Arguments.of(GroupProtocol.CLASSIC.name.toLowerCase(Locale.ROOT), "inkless"),
+        Arguments.of(GroupProtocol.CONSUMER.name.toLowerCase(Locale.ROOT), "inkless")
       )
     } else {
       Stream.of(
-        Arguments.of("kraft", GroupProtocol.CLASSIC.name.toLowerCase(Locale.ROOT), "classic"),
-        Arguments.of("kraft", GroupProtocol.CONSUMER.name.toLowerCase(Locale.ROOT), "classic")
+        Arguments.of(GroupProtocol.CLASSIC.name.toLowerCase(Locale.ROOT), "classic"),
+        Arguments.of(GroupProtocol.CONSUMER.name.toLowerCase(Locale.ROOT), "classic")
       )
     }
   }

@@ -82,6 +82,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.{CompletableFuture, ConcurrentHashMap, Future, RejectedExecutionException, TimeUnit}
 import java.util.{Collections, Optional, OptionalInt, OptionalLong}
 import java.util.function.Consumer
+import java.util.stream.Collectors
 import scala.collection.{Map, Seq, Set, immutable, mutable}
 import scala.jdk.CollectionConverters._
 import scala.jdk.OptionConverters.RichOptional
@@ -711,34 +712,33 @@ class ReplicaManager(val config: KafkaConfig,
       return
     }
 
-    val (inklessEntries, classicEntries) = entriesPerPartition.partition { case (k, v) =>
+    val (inklessEntries, classicEntries) = entriesPerPartition.partition { case (k, _) =>
       inklessAppendHandler.exists(_.isInkless(k.topic()))
     }
 
     val inklessResponsesFuture = inklessAppendHandler match {
       case Some(interceptor) => interceptor.handle(inklessEntries.asJava, requestLocal)
-      case _ => CompletableFuture.completedFuture(util.Map.of[TopicPartition, PartitionResponse]())
+      case _ => CompletableFuture.completedFuture(util.Map.of[TopicIdPartition, PartitionResponse]())
     }
 
-    def classicResponseCallback(classicResult: Map[TopicPartition, PartitionResponse]): Unit = {
+    def classicResponseCallback(classicResult: Map[TopicIdPartition, PartitionResponse]): Unit = {
       inklessResponsesFuture.whenComplete { case (result, e) =>
-        val inklessResult = if (result != null) result.asScala else {
+        val inklessResult: Map[TopicIdPartition, PartitionResponse] = if (result != null) result.asScala else {
           error("Inkless append future failed", e)
           inklessEntries.map{ case (tp, _) => tp -> new PartitionResponse(Errors.UNKNOWN_SERVER_ERROR)}
         }
-        val inklessAppendResults = new mutable.HashMap[TopicOptionalIdPartition, LogAppendResult]
+        val inklessAppendResults = new mutable.HashMap[TopicIdPartition, LogAppendResult]
         inklessResult.foreach {
-          case (tp, _) => {
+          case (tp, _) =>
             // Consider every successful produce request as if it increased the high watermark. This is a simplification
             // that will always result in the attempt to complete the delayed operations.
             // The current implementation does not take into account that other brokers might have performed appends
             // that would unblock delayed operations in the purgatories of this broker.
             val logAppendInfo = LogAppendInfo.UNKNOWN_LOG_APPEND_INFO.copy(LeaderHwChange.INCREASED)
             val logAppendResult =  LogAppendResult(logAppendInfo, None, hasCustomErrorMessage = false)
-            inklessAppendResults += (new TopicOptionalIdPartition(Optional.empty(), tp) -> logAppendResult)
-          }
+            inklessAppendResults += (tp -> logAppendResult)
         }
-        addCompletePurgatoryAction(actionQueue, inklessAppendResults)
+        addCompletePurgatoryAction(this.defaultActionQueue, inklessAppendResults)
         responseCallback(inklessResult ++ classicResult)
       }
     }
@@ -1331,7 +1331,7 @@ class ReplicaManager(val config: KafkaConfig,
             .setLogDir(absolutePath)
             .setErrorCode(Errors.forException(t).code)
       }
-    }).toList()
+    }).collect(Collectors.toList[DescribeLogDirsResponseData.DescribeLogDirsResult]())
   }
 
   // See: https://bugs.openjdk.java.net/browse/JDK-8162520

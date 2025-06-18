@@ -476,10 +476,10 @@ class KRaftMetadataCache(
       image.highestOffsetAndEpoch().offset)
   }
 
-  override def isInklessTopic(topic: String, defaultConfig: Supplier[Map[String, _]]): Boolean = {
+  def isInklessTopic(topic: String, defaultConfig: Supplier[util.Map[String, AnyRef]]): Boolean = {
     val topicConfigs = topicConfig(topic)
     // avoid instantiating LogConfig as it is expensive
-    val defaultInklessEnable = defaultConfig.get().getOrElse(TopicConfig.INKLESS_ENABLE_CONFIG, "false").toString.toBoolean
+    val defaultInklessEnable = defaultConfig.get().getOrDefault(TopicConfig.INKLESS_ENABLE_CONFIG, "false").toString.toBoolean
     val inklessEnabled = if (topicConfigs.containsKey(TopicConfig.INKLESS_ENABLE_CONFIG)) topicConfigs.getProperty(TopicConfig.INKLESS_ENABLE_CONFIG, "false").toBoolean else defaultInklessEnable
     val isNotInternalTopic = !Topic.isInternal(topic)
     val isNotClusterMetaTopic = topic != Topic.CLUSTER_METADATA_TOPIC_NAME

@@ -19,23 +19,22 @@
 package kafka.server.metadata
 
 import io.aiven.inkless.control_plane.MetadataView
-import org.apache.kafka.admin.BrokerMetadata
 import org.apache.kafka.common.config.ConfigResource
-import org.apache.kafka.common.{TopicIdPartition, Uuid}
+import org.apache.kafka.common.network.ListenerName
+import org.apache.kafka.common.{Node, TopicIdPartition, Uuid}
 
 import java.util.Properties
 import java.util.function.Supplier
+import java.util.stream.{Collectors, IntStream}
 import java.{lang, util}
-import scala.collection.Map
-import scala.jdk.CollectionConverters.{IterableHasAsJava, MapHasAsJava, SetHasAsJava}
 
-class InklessMetadataView(val metadataCache: KRaftMetadataCache, val defaultConfig: Supplier[Map[String, _]]) extends MetadataView {
+class InklessMetadataView(val metadataCache: KRaftMetadataCache, val defaultConfig: Supplier[util.Map[String, AnyRef]]) extends MetadataView {
   override def getDefaultConfig: util.Map[String, AnyRef] = {
-    defaultConfig.get().asJava.asInstanceOf[util.Map[String, AnyRef]]
+    defaultConfig.get()
   }
 
-  override def getAliveBrokers: lang.Iterable[BrokerMetadata] = {
-    metadataCache.getAliveBrokers().asJava
+  override def getAliveBrokerNodes(listenerName: ListenerName): lang.Iterable[Node] = {
+    metadataCache.getAliveBrokerNodes(listenerName)
   }
 
   override def getBrokerCount: Integer = metadataCache.currentImage().cluster().brokers().size()
@@ -53,11 +52,10 @@ class InklessMetadataView(val metadataCache: KRaftMetadataCache, val defaultConf
   }
 
   override def getInklessTopicPartitions: util.Set[TopicIdPartition] = {
-    metadataCache.getAllTopics()
+    metadataCache.getAllTopics().stream()
       .filter(isInklessTopic)
-      .flatMap(metadataCache.getTopicPartitions)
-      .map(tp => new TopicIdPartition(metadataCache.getTopicId(tp.topic()), tp))
-      .toSet
-      .asJava
+      .flatMap(t => IntStream.range(0, metadataCache.numPartitions(t).get())
+        .mapToObj(p => new TopicIdPartition(metadataCache.getTopicId(t), p, t)))
+      .collect(Collectors.toSet[TopicIdPartition]())
   }
 }

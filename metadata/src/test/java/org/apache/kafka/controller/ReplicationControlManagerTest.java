@@ -708,7 +708,7 @@ public class ReplicationControlManagerTest {
         // When creating a topic without brokers available
         ControllerRequestContext requestContext = anonymousContextFor(ApiKeys.CREATE_TOPICS);
         ControllerResult<CreateTopicsResponseData> result =
-            replicationControl.createTopics(requestContext, request, List.of("foo"));
+            replicationControl.createTopics(requestContext, request, Set.of("foo"));
         // Then the topic creation should fail with BROKER_NOT_AVAILABLE error
         CreateTopicsResponseData expectedResponse = new CreateTopicsResponseData();
         expectedResponse.topics().add(new CreatableTopicResult().setName("foo").
@@ -723,7 +723,7 @@ public class ReplicationControlManagerTest {
 
         // When creating a topic with inkless enabled
         ControllerResult<CreateTopicsResponseData> result2 =
-            replicationControl.createTopics(requestContext, request, List.of("foo"));
+            replicationControl.createTopics(requestContext, request, Set.of("foo"));
         // Then the topic creation should succeed, regardless of fenced brokers
         CreateTopicsResponseData expectedResponse2 = new CreateTopicsResponseData();
         expectedResponse2.topics().add(new CreatableTopicResult().setName("foo").
@@ -738,7 +738,7 @@ public class ReplicationControlManagerTest {
 
         // When creating a topic with inkless enabled
         ControllerResult<CreateTopicsResponseData> result3 =
-            replicationControl.createTopics(requestContext, request, List.of("foo"));
+            replicationControl.createTopics(requestContext, request, Set.of("foo"));
         // Then the topic creation should succeed, regardless of the RF
         CreateTopicsResponseData expectedResponse3 = new CreateTopicsResponseData();
         expectedResponse3.topics().add(new CreatableTopicResult().setName("foo").
@@ -764,7 +764,7 @@ public class ReplicationControlManagerTest {
 
         // When creating a topic with inkless enabled and already exists
         ControllerResult<CreateTopicsResponseData> result4 =
-            replicationControl.createTopics(requestContext, request, List.of("foo"));
+            replicationControl.createTopics(requestContext, request, Set.of("foo"));
         CreateTopicsResponseData expectedResponse4 = new CreateTopicsResponseData();
         // Then the topic creation should fail with TOPIC_ALREADY_EXISTS error
         expectedResponse4.topics().add(new CreatableTopicResult().setName("foo").
@@ -803,7 +803,7 @@ public class ReplicationControlManagerTest {
             .setConfigs(inklessConfig));
 
         ControllerResult<CreateTopicsResponseData> result1 =
-            replicationControl.createTopics(requestContext, request1, List.of("baz"));
+            replicationControl.createTopics(requestContext, request1, Set.of("baz"));
         assertEquals(Errors.valueOf(expectedError).code(), result1.response().topics().find("baz").errorCode());
         assertEquals(List.of(), result1.records());
     }
@@ -836,7 +836,7 @@ public class ReplicationControlManagerTest {
         // When creating an internal topic with inkless enabled, disable it
         ControllerRequestContext requestContext = anonymousContextFor(ApiKeys.CREATE_TOPICS);
         ControllerResult<CreateTopicsResponseData> result =
-            replicationControl.createTopics(requestContext, request, List.of(internalTopic));
+            replicationControl.createTopics(requestContext, request, Set.of(internalTopic));
         CreateTopicsResponseData expectedResponse = new CreateTopicsResponseData();
         // Then the topic creation should fail with TOPIC_ALREADY_EXISTS error
         expectedResponse.topics().add(

@@ -17,7 +17,7 @@ import kafka.api.BaseConsumerTest.{DeserializerImpl, SerializerImpl}
 import java.time.Duration
 import java.util
 import java.util.{Locale, Optional, Properties}
-import kafka.server.{KafkaBroker, QuorumAndGroupProtocolAndMaybeTopicTypeProvider}
+import kafka.server.{KafkaBroker, GroupProtocolAndMaybeTopicTypeProvider}
 import kafka.utils.{TestInfoUtils, TestUtils}
 import org.apache.kafka.clients.admin.{NewPartitions, NewTopic}
 import org.apache.kafka.clients.consumer._
@@ -215,7 +215,7 @@ class PlaintextConsumerTest extends BaseConsumerTest {
   @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
   @Tag("noinkless") // after pause, it fetches the initial records again, like pause is not holding the records consumed, TODO investigate
   def testPartitionPauseAndResume(groupProtocol: String, topicType: String): Unit = {
-    val partitions = List(tp).asJava
+    val partitions = util.List.of(tp)
     val producer = createProducer()
     var startingTimestamp = System.currentTimeMillis()
     sendRecords(producer, numRecords = 5, tp, startingTimestamp = startingTimestamp)
@@ -365,8 +365,8 @@ class PlaintextConsumerTest extends BaseConsumerTest {
       startingTimestamp = startTime, timestampType = TimestampType.LOG_APPEND_TIME)
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
   def testListTopics(groupProtocol: String, topicType: String): Unit = {
     val numParts = 2
     val topic1 = "part-test-topic-1"
@@ -386,9 +386,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertEquals(2, topics.get(topic3).size)
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testPauseStateNotPreservedByRebalance(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testPauseStateNotPreservedByRebalance(groupProtocol: String, topicType: String): Unit = {
     if (groupProtocol.equals(GroupProtocol.CLASSIC.name)) {
       this.consumerConfig.setProperty(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "100") // timeout quickly to avoid slow test
       this.consumerConfig.setProperty(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, "30")
@@ -410,9 +410,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     consumeAndVerifyRecords(consumer = consumer, numRecords = 0, startingOffset = 5, startingTimestamp = startingTimestamp)
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testPerPartitionLeadMetricsCleanUpWithSubscribe(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testPerPartitionLeadMetricsCleanUpWithSubscribe(groupProtocol: String, topicType: String): Unit = {
     val numMessages = 1000
     val topic2 = "topic2"
     createTopic(topic2, 2)
@@ -450,9 +450,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertNull(consumer.metrics.get(new MetricName("records-lead", "consumer-fetch-manager-metrics", "", tags2)))
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testPerPartitionLagMetricsCleanUpWithSubscribe(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testPerPartitionLagMetricsCleanUpWithSubscribe(groupProtocol: String, topicType: String): Unit = {
     val numMessages = 1000
     val topic2 = "topic2"
     createTopic(topic2, 2)
@@ -491,9 +491,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertNull(consumer.metrics.get(new MetricName("records-lag", "consumer-fetch-manager-metrics", "", tags2)))
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testPerPartitionLeadMetricsCleanUpWithAssign(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testPerPartitionLeadMetricsCleanUpWithAssign(groupProtocol: String, topicType: String): Unit = {
     val numMessages = 1000
     // Test assign
     // send some messages.
@@ -521,9 +521,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertNull(consumer.metrics.get(new MetricName("records-lead", "consumer-fetch-manager-metrics", "", tags)))
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testPerPartitionLagMetricsCleanUpWithAssign(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testPerPartitionLagMetricsCleanUpWithAssign(groupProtocol: String, topicType: String): Unit = {
     val numMessages = 1000
     // Test assign
     // send some messages.
@@ -553,10 +553,10 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertNull(consumer.metrics.get(new MetricName("records-lag", "consumer-fetch-manager-metrics", "", tags)))
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
   @Tag("noinkless") // Transactions is an unsupported feature atm
-  def testPerPartitionLagMetricsWhenReadCommitted(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  def testPerPartitionLagMetricsWhenReadCommitted(groupProtocol: String, topicType: String): Unit = {
     val numMessages = 1000
     // send some messages.
     val producer = createProducer()
@@ -578,9 +578,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertNotNull(fetchLag)
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testQuotaMetricsNotCreatedIfNoQuotasConfigured(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testQuotaMetricsNotCreatedIfNoQuotasConfigured(groupProtocol: String, topicType: String): Unit = {
     val numRecords = 1000
     val producer = createProducer()
     val startingTimestamp = System.currentTimeMillis()
@@ -610,9 +610,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     brokers.foreach(assertNoMetric(_, "throttle-time", QuotaType.REQUEST, consumerClientId))
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testConsumingWithNullGroupId(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testConsumingWithNullGroupId(groupProtocol: String, topicType: String): Unit = {
     val topic = "test_topic"
     val partition = 0
     val tp = new TopicPartition(topic, partition)
@@ -676,9 +676,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertEquals(2, numRecords3, "Expected consumer3 to consume from offset 1")
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testNullGroupIdNotSupportedIfCommitting(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testNullGroupIdNotSupportedIfCommitting(groupProtocol: String, topicType: String): Unit = {
     val consumer1Config = new Properties(consumerConfig)
     consumer1Config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
     consumer1Config.put(ConsumerConfig.CLIENT_ID_CONFIG, "consumer1")
@@ -690,9 +690,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertThrows(classOf[InvalidGroupIdException], () => consumer1.commitSync())
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testStaticConsumerDetectsNewPartitionCreatedAfterRestart(quorum:String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testStaticConsumerDetectsNewPartitionCreatedAfterRestart(groupProtocol: String, topicType: String): Unit = {
     val foo = "foo"
     val foo0 = new TopicPartition(foo, 0)
     val foo1 = new TopicPartition(foo, 1)
@@ -700,7 +700,7 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     val admin = createAdminClient()
     val props = new util.HashMap[String, String]
     props.put("inkless.enable", "true")
-    admin.createTopics(Seq(new NewTopic(foo, 1, 1.toShort).configs(props)).asJava).all.get
+    admin.createTopics(util.Set.of(new NewTopic(foo, 1, 1.toShort).configs(props))).all.get
 
     val consumerConfig = new Properties
     consumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "my-group-id")
@@ -722,9 +722,9 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     consumer2.close()
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testEndOffsets(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testEndOffsets(groupProtocol: String, topicType: String): Unit = {
     val producer = createProducer()
     val startingTimestamp = System.currentTimeMillis()
     val numRecords = 10000
@@ -744,19 +744,19 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertEquals(numRecords, endOffsets.get(tp))
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testSeekThrowsIllegalStateIfPartitionsNotAssigned(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testSeekThrowsIllegalStateIfPartitionsNotAssigned(groupProtocol: String, topicType: String): Unit = {
     val tp = new TopicPartition(topic, 0)
     val consumer = createConsumer(configOverrides = consumerConfig)
     val e: Exception = assertThrows(classOf[IllegalStateException], () => consumer.seekToEnd(util.List.of(tp)))
     assertEquals("No current assignment for partition " + tp, e.getMessage)
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
   @Tag("noinkless") // Fetch by time is an unsupported feature atm
-  def testFetchOffsetsForTime(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  def testFetchOffsetsForTime(groupProtocol: String, topicType: String): Unit = {
     val numPartitions = 2
     val producer = createProducer()
     val timestampsToSearch = new util.HashMap[TopicPartition, java.lang.Long]()
@@ -786,10 +786,10 @@ class PlaintextConsumerTest extends BaseConsumerTest {
     assertEquals(Optional.of(0), timestampTp1.leaderEpoch)
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
   @Timeout(15)
-  def testPositionRespectsTimeout(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  def testPositionRespectsTimeout(groupProtocol: String, topicType: String): Unit = {
     val topicPartition = new TopicPartition(topic, 15)
     val consumer = createConsumer()
     consumer.assign(java.util.List.of(topicPartition))

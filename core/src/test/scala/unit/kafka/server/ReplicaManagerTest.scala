@@ -6359,14 +6359,14 @@ class ReplicaManagerTest {
     val RECORDS: MemoryRecords = MemoryRecords.withRecords(
       2.toByte, 0L, Compression.NONE, TimestampType.CREATE_TIME, 123L, 0.toShort, 0, 0, false, new SimpleRecord(0, "hello".getBytes())
     )
-    val inklessTopicPartition = new TopicPartition("inkless", 0)
-    val classicTopicPartition = new TopicPartition("classic", 0)
+    val inklessTopicPartition = new TopicIdPartition(Uuid.randomUuid(), 0, "inkless")
+    val classicTopicPartition = new TopicIdPartition(Uuid.randomUuid(), 0, "classic")
 
     @Test
     def testAppendInklessEntries(): Unit = {
       val entriesPerPartition = Map(inklessTopicPartition -> RECORDS)
       val inklessResponse = Map(inklessTopicPartition -> new PartitionResponse(Errors.NONE))
-      val inklessFutureResult = CompletableFuture.completedFuture[util.Map[TopicPartition, PartitionResponse]](
+      val inklessFutureResult = CompletableFuture.completedFuture[util.Map[TopicIdPartition, PartitionResponse]](
         inklessResponse.asJava
       )
       val appendHandlerCtorMockInitializer: MockedConstruction.MockInitializer[AppendHandler] = {
@@ -6382,7 +6382,7 @@ class ReplicaManagerTest {
         appendHandlerCtor.close()
       }
 
-      val responseCallback = mock(classOf[Function[Map[TopicPartition, PartitionResponse], Unit]])
+      val responseCallback = mock(classOf[Function[Map[TopicIdPartition, PartitionResponse], Unit]])
       replicaManager.appendRecords(
         timeout = 0,
         requiredAcks = -1,
@@ -6402,7 +6402,7 @@ class ReplicaManagerTest {
         classicTopicPartition -> RECORDS,
       )
       val inklessResponse = Map(inklessTopicPartition -> new PartitionResponse(Errors.NONE))
-      val inklessFutureResult = CompletableFuture.completedFuture[util.Map[TopicPartition, PartitionResponse]](
+      val inklessFutureResult = CompletableFuture.completedFuture[util.Map[TopicIdPartition, PartitionResponse]](
         inklessResponse.asJava
       )
       val appendHandlerCtorMockInitializer: MockedConstruction.MockInitializer[AppendHandler] = {
@@ -6418,7 +6418,7 @@ class ReplicaManagerTest {
         appendHandlerCtor.close()
       }
 
-      val responseCallback = mock(classOf[Function[Map[TopicPartition, PartitionResponse], Unit]])
+      val responseCallback = mock(classOf[Function[Map[TopicIdPartition, PartitionResponse], Unit]])
       replicaManager.appendRecords(
         timeout = 0,
         requiredAcks = -1,
@@ -6444,7 +6444,7 @@ class ReplicaManagerTest {
       )
       val appendHandlerCtorMockInitializer: MockedConstruction.MockInitializer[AppendHandler] = {
         case (mock, _) =>
-          when(mock.handle(any(), any())).thenReturn(CompletableFuture.completedFuture[util.Map[TopicPartition, PartitionResponse]](
+          when(mock.handle(any(), any())).thenReturn(CompletableFuture.completedFuture[util.Map[TopicIdPartition, PartitionResponse]](
             util.Map.of(inklessTopicPartition, new PartitionResponse(Errors.INVALID_REQUEST))
         ))
           when(mock.isInkless(any())).thenReturn(false)
@@ -6457,7 +6457,7 @@ class ReplicaManagerTest {
         appendHandlerCtor.close()
       }
 
-      val responseCallback = mock(classOf[Function[Map[TopicPartition, PartitionResponse], Unit]])
+      val responseCallback = mock(classOf[Function[Map[TopicIdPartition, PartitionResponse], Unit]])
       replicaManager.appendRecords(
         timeout = 0,
         requiredAcks = -1,
@@ -6484,7 +6484,7 @@ class ReplicaManagerTest {
       )
       val appendHandlerCtorMockInitializer: MockedConstruction.MockInitializer[AppendHandler] = {
         case (mock, _) =>
-          when(mock.handle(any(), any())).thenReturn(CompletableFuture.failedFuture[util.Map[TopicPartition, PartitionResponse]](
+          when(mock.handle(any(), any())).thenReturn(CompletableFuture.failedFuture[util.Map[TopicIdPartition, PartitionResponse]](
              new Exception()
           ))
           when(mock.isInkless(any())).thenReturn(false)
@@ -6497,7 +6497,7 @@ class ReplicaManagerTest {
         appendHandlerCtor.close()
       }
 
-      val responseCallback = mock(classOf[Function[Map[TopicPartition, PartitionResponse], Unit]])
+      val responseCallback = mock(classOf[Function[Map[TopicIdPartition, PartitionResponse], Unit]])
       replicaManager.appendRecords(
         timeout = 0,
         requiredAcks = -1,
@@ -6536,7 +6536,7 @@ class ReplicaManagerTest {
         scheduler = time.scheduler,
         logManager = logManagerMock,
         quotaManagers = quotaManager,
-        metadataCache = MetadataCache.kRaftMetadataCache(config.brokerId, () => KRaftVersion.KRAFT_VERSION_0),
+        metadataCache = new KRaftMetadataCache(config.brokerId, () => KRaftVersion.KRAFT_VERSION_0),
         logDirFailureChannel = logDirFailureChannel,
         alterPartitionManager = alterPartitionManager,
         threadNamePrefix = Option(this.getClass.getName),

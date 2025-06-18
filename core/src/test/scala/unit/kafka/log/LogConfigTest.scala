@@ -438,11 +438,11 @@ class LogConfigTest {
     val logProps = new Properties
     logProps.put(TopicConfig.INKLESS_ENABLE_CONFIG, enable.toString)
     // Should be possible to set inkless to true/false at creation time
-    LogConfig.validate(Collections.emptyMap(), logProps, kafkaConfig.extractLogConfigMap, false)
+    LogConfig.validate(util.Map.of, logProps, kafkaConfig.extractLogConfigMap, false)
     // But fail to reset value after creation
     assertThrows(
       classOf[InvalidConfigurationException],
-      () => LogConfig.validate(Collections.singletonMap(TopicConfig.INKLESS_ENABLE_CONFIG, (!enable).toString), logProps, kafkaConfig.extractLogConfigMap, false))
+      () => LogConfig.validate(util.Map.of(TopicConfig.INKLESS_ENABLE_CONFIG, (!enable).toString), logProps, kafkaConfig.extractLogConfigMap, false))
   }
 
   @Test
@@ -457,19 +457,19 @@ class LogConfigTest {
     // Add Inkless
     val t1 = assertThrows(
       classOf[InvalidConfigurationException],
-      () => LogConfig.validate(Map(TopicConfig.REMOTE_LOG_STORAGE_ENABLE_CONFIG -> "true").asJava, logProps, kafkaConfig.extractLogConfigMap, true))
+      () => LogConfig.validate(util.Map.of(TopicConfig.REMOTE_LOG_STORAGE_ENABLE_CONFIG, "true"), logProps, kafkaConfig.extractLogConfigMap, true))
     assertEquals("Inkless and remote storage cannot be enabled simultaneously", t1.getMessage)
 
     // Add remote storage
     val t2 = assertThrows(
       classOf[InvalidConfigurationException],
-      () => LogConfig.validate(Map(TopicConfig.INKLESS_ENABLE_CONFIG -> "true").asJava, logProps, kafkaConfig.extractLogConfigMap, true))
+      () => LogConfig.validate(util.Map.of(TopicConfig.INKLESS_ENABLE_CONFIG, "true"), logProps, kafkaConfig.extractLogConfigMap, true))
     assertEquals("Inkless and remote storage cannot be enabled simultaneously", t2.getMessage)
 
     // Add both
     val t3 = assertThrows(
       classOf[InvalidConfigurationException],
-      () => LogConfig.validate(Collections.emptyMap(), logProps, kafkaConfig.extractLogConfigMap, true))
+      () => LogConfig.validate(util.Map.of, logProps, kafkaConfig.extractLogConfigMap, true))
     assertEquals("Inkless and remote storage cannot be enabled simultaneously", t3.getMessage)
   }
 

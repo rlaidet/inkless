@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
-import org.junit.jupiter.api.Assertions.{assertEquals, assertNotEquals}
+import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Test
 
 import java.nio.charset.StandardCharsets
@@ -52,9 +52,9 @@ class ProducerSendWhileDeletionTest extends IntegrationTestHarness {
    * Producer will attempt to send messages to the partition specified in each record, and should
    * succeed as long as the partition is included in the metadata.
    */
-  @ParameterizedTest(name = "{displayName}.quorum={0}.topicType={1}")
-  @CsvSource(Array("kraft,classic", "kraft,inkless"))
-  def testSendWithTopicDeletionMidWay(quorum: String, topicType: String): Unit = {
+  @ParameterizedTest(name = "{displayName}.topicType={1}")
+  @CsvSource(Array("classic", "inkless"))
+  def testSendWithTopicDeletionMidWay(topicType: String): Unit = {
     val numRecords = 10
     val topic = "topic"
 
