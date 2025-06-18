@@ -18,7 +18,6 @@
 package io.aiven.inkless.produce;
 
 import org.apache.kafka.common.TopicIdPartition;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.requests.ProduceResponse.PartitionResponse;
 
@@ -46,9 +45,9 @@ import io.aiven.inkless.control_plane.CommitBatchRequest;
  */
 record ClosedFile(Instant start,
                   Map<Integer, Map<TopicIdPartition, MemoryRecords>> originalRequests,
-                  Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest,
+                  Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest,
                   List<CommitBatchRequest> commitBatchRequests,
-                  Map<Integer, Map<TopicPartition, PartitionResponse>> invalidResponseByRequest,
+                  Map<Integer, Map<TopicIdPartition, PartitionResponse>> invalidResponseByRequest,
                   byte[] data) {
     ClosedFile {
         Objects.requireNonNull(originalRequests, "originalRequests cannot be null");
@@ -87,19 +86,18 @@ record ClosedFile(Instant start,
 
             // For each original partition, verify it exists in either valid or invalid collections
             for (final var originalPartition : originalTopicPartitions) {
-                final var topicPartition = originalPartition.topicPartition();
                 boolean foundInValid = validCommitRequests.contains(originalPartition);
-                boolean foundInInvalid = invalidResponses.contains(topicPartition);
+                boolean foundInInvalid = invalidResponses.contains(originalPartition);
 
                 if (!foundInValid && !foundInInvalid) {
                     throw new IllegalArgumentException(
                         "No corresponding valid or invalid response found for partition " +
-                            topicPartition + " in request " + requestId);
+                            originalPartition.topicPartition() + " in request " + requestId);
                 }
 
                 if (foundInValid && foundInInvalid) {
                     throw new IllegalArgumentException(
-                        "Partition " + topicPartition + " in request " + requestId +
+                        "Partition " + originalPartition.topicPartition() + " in request " + requestId +
                             " found in both valid and invalid collections");
                 }
             }

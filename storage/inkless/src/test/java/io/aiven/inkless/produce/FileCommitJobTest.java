@@ -18,7 +18,6 @@
 package io.aiven.inkless.produce;
 
 import org.apache.kafka.common.TopicIdPartition;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.protocol.Errors;
@@ -110,7 +109,7 @@ class FileCommitJobTest {
 
     @Test
     void commitFinishedSuccessfully() {
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );
@@ -141,7 +140,7 @@ class FileCommitJobTest {
     void commitFinishedSuccessfullyZeroBatches() {
         // We sent two requests, both without any batch.
 
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );
@@ -165,7 +164,7 @@ class FileCommitJobTest {
 
     @Test
     void commitFinishedWithError() {
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );
@@ -186,7 +185,7 @@ class FileCommitJobTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void deleteObjectWhenFailureOnCommitIsFromControlPlane(boolean isSafeToDelete) throws Exception {
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );
@@ -206,7 +205,7 @@ class FileCommitJobTest {
 
     @Test
     void doNotDeleteObjectWhenFailureOnCommitIsNotFromControlPlane() throws Exception {
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );

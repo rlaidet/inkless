@@ -117,7 +117,7 @@ class ClosedFileTest {
                 Map.of(1, Map.of(TID0P0, MemoryRecords.EMPTY)),
                 Map.of(1, new CompletableFuture<>()),
                 List.of(CommitBatchRequest.of(1, TID0P0, 0, 0, 0, 0, 0, TimestampType.CREATE_TIME)),
-                Map.of(1, Map.of(T0P0, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR))),
+                Map.of(1, Map.of(TID0P0, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR))),
                 new byte[10]).size())
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Partition t0-0 in request 1 found in both valid and invalid collections");
@@ -130,7 +130,7 @@ class ClosedFileTest {
                 Map.of(1, Map.of(TID0P0, MemoryRecords.EMPTY)),
                 Map.of(1, new CompletableFuture<>()),
                 List.of(), // no commit request
-                Map.of(2, Map.of(T0P0, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR))), // invalid with different request ID
+                Map.of(2, Map.of(TID0P0, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR))), // invalid with different request ID
                 new byte[10]).size())
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("No corresponding valid or invalid response found for partition t0-0 in request 1");
@@ -143,7 +143,7 @@ class ClosedFileTest {
                 Map.of(1, Map.of(TID0P0, MemoryRecords.EMPTY)),
                 Map.of(1, new CompletableFuture<>()),
                 List.of(CommitBatchRequest.of(1, TID0P0, 0, 0, 0, 0, 0, TimestampType.CREATE_TIME)),
-                Map.of(1, Map.of(new TopicPartition("t0", 1), new PartitionResponse(Errors.KAFKA_STORAGE_ERROR))), // another partition
+                Map.of(1, Map.of(new TopicIdPartition(Uuid.randomUuid(), 1, "t0"), new PartitionResponse(Errors.KAFKA_STORAGE_ERROR))), // another partition
                 new byte[10]).size())
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("Total number of valid and invalid responses doesn't match original requests for request id 1");

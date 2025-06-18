@@ -65,8 +65,8 @@ class ActiveFile {
     private final BatchBuffer buffer;
 
     private final Map<Integer, Map<TopicIdPartition, MemoryRecords>> originalRequests = new HashMap<>();
-    private final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = new HashMap<>();
-    private final Map<Integer, Map<TopicPartition, PartitionResponse>> invalidBatchesByRequest = new HashMap<>();
+    private final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = new HashMap<>();
+    private final Map<Integer, Map<TopicIdPartition, PartitionResponse>> invalidBatchesByRequest = new HashMap<>();
 
     private final BrokerTopicStats brokerTopicStats;
     private final LogValidator.MetricsRecorder validatorMetricsRecorder;
@@ -89,7 +89,7 @@ class ActiveFile {
     }
 
     // Eventually this could be refactored to be included within ReplicaManager as it shares a lot of similarities
-    CompletableFuture<Map<TopicPartition, PartitionResponse>> add(
+    CompletableFuture<Map<TopicIdPartition, PartitionResponse>> add(
         final Map<TopicIdPartition, MemoryRecords> entriesPerPartition,
         final Map<String, LogConfig> topicConfigs,
         final RequestLocal requestLocal
@@ -148,10 +148,10 @@ class ActiveFile {
             } catch (RecordTooLargeException | CorruptRecordException | KafkaStorageException e) {
                 // NOTE: Failed produce requests metric is not incremented for known exceptions
                 // it is supposed to indicate un-expected failures of a broker in handling a produce request
-                invalidBatches.put(topicIdPartition.topicPartition(), new PartitionResponse(Errors.forException(e)));
+                invalidBatches.put(topicIdPartition, new PartitionResponse(Errors.forException(e)));
             } catch (RecordValidationException rve) {
                 processFailedRecords(topicIdPartition.topicPartition(), rve.invalidException());
-                invalidBatches.put(topicIdPartition.topicPartition(),
+                invalidBatches.put(topicIdPartition,
                     new PartitionResponse(
                         Errors.forException(rve.invalidException()),
                         ProduceResponse.INVALID_OFFSET,
@@ -162,11 +162,11 @@ class ActiveFile {
                     ));
             } catch (Throwable t) {
                 processFailedRecords(topicIdPartition.topicPartition(), t);
-                invalidBatches.put(topicIdPartition.topicPartition(), new PartitionResponse(Errors.forException(t)));
+                invalidBatches.put(topicIdPartition, new PartitionResponse(Errors.forException(t)));
             }
         }
 
-        final CompletableFuture<Map<TopicPartition, PartitionResponse>> result = new CompletableFuture<>();
+        final CompletableFuture<Map<TopicIdPartition, PartitionResponse>> result = new CompletableFuture<>();
         awaitingFuturesByRequest.put(requestId, result);
 
         return result;

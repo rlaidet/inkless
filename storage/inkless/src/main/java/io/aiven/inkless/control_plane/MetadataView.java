@@ -17,9 +17,10 @@
  */
 package io.aiven.inkless.control_plane;
 
-import org.apache.kafka.admin.BrokerMetadata;
+import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicIdPartition;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.network.ListenerName;
 
 import java.util.Map;
 import java.util.Properties;
@@ -28,7 +29,7 @@ import java.util.Set;
 public interface MetadataView {
     Map<String, Object> getDefaultConfig();
 
-    Iterable<BrokerMetadata> getAliveBrokers();
+    Iterable<Node> getAliveBrokerNodes(ListenerName listenerName);
 
     Integer getBrokerCount();
 

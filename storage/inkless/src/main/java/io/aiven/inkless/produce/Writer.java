@@ -18,7 +18,6 @@
 package io.aiven.inkless.produce;
 
 import org.apache.kafka.common.TopicIdPartition;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.requests.ProduceResponse.PartitionResponse;
 import org.apache.kafka.common.utils.Time;
@@ -132,7 +131,7 @@ class Writer implements Closeable {
         this.activeFile = new ActiveFile(time, brokerTopicStats);
     }
 
-    CompletableFuture<Map<TopicPartition, PartitionResponse>> write(
+    CompletableFuture<Map<TopicIdPartition, PartitionResponse>> write(
         final Map<TopicIdPartition, MemoryRecords> entriesPerPartition,
         final Map<String, LogConfig> topicConfigs,
         final RequestLocal requestLocal

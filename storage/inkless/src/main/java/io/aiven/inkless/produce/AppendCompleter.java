@@ -17,7 +17,7 @@
  */
 package io.aiven.inkless.produce;
 
-import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.TopicIdPartition;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.RecordBatch;
 import org.apache.kafka.common.record.TimestampType;
@@ -49,7 +49,7 @@ class AppendCompleter {
         LOGGER.debug("Committed successfully");
 
         // Each request must have a response.
-        final Map<Integer, Map<TopicPartition, ProduceResponse.PartitionResponse>> resultsPerRequest = file
+        final Map<Integer, Map<TopicIdPartition, ProduceResponse.PartitionResponse>> resultsPerRequest = file
                 .awaitingFuturesByRequest()
                 .entrySet().stream()
                 .collect(Collectors.toMap(Map.Entry::getKey, ignore -> new HashMap<>()));
@@ -60,12 +60,12 @@ class AppendCompleter {
             final var commitBatchResponse = commitBatchResponses.get(i);
 
             result.put(
-                    commitBatchRequest.topicIdPartition().topicPartition(),
+                    commitBatchRequest.topicIdPartition(),
                     partitionResponse(commitBatchResponse)
             );
         }
 
-        for (Map.Entry<Integer, Map<TopicPartition, ProduceResponse.PartitionResponse>> invalidResponses : file.invalidResponseByRequest().entrySet()) {
+        for (Map.Entry<Integer, Map<TopicIdPartition, ProduceResponse.PartitionResponse>> invalidResponses : file.invalidResponseByRequest().entrySet()) {
             resultsPerRequest.computeIfAbsent(invalidResponses.getKey(), ignore -> new HashMap<>()).putAll(invalidResponses.getValue());
         }
 
@@ -98,8 +98,8 @@ class AppendCompleter {
             final var originalRequest = file.originalRequests().get(entry.getKey());
             final var result = originalRequest.entrySet().stream()
                     .collect(Collectors.toMap(
-                            kv -> kv.getKey().topicPartition(),
-                            ignore -> new ProduceResponse.PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data")));
+                        Map.Entry::getKey,
+                        ignore -> new ProduceResponse.PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data")));
             entry.getValue().complete(result);
         }
     }

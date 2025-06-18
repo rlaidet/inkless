@@ -18,7 +18,6 @@
 package io.aiven.inkless.produce;
 
 import org.apache.kafka.common.TopicIdPartition;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.config.TopicConfig;
@@ -343,10 +342,10 @@ class WriterPropertyTest {
         private final int maxRequestCount;
         private int requestCount = 0;
         private final Map<TopicIdPartition, List<MemoryRecords>> sentRequests = new HashMap<>();
-        private List<CompletableFuture<Map<TopicPartition, ProduceResponse.PartitionResponse>>> waitingResponseFutures =
+        private List<CompletableFuture<Map<TopicIdPartition, ProduceResponse.PartitionResponse>>> waitingResponseFutures =
             new ArrayList<>();
-        private final Map<TopicPartition, List<Long>> assignedOffsets = new HashMap<>();
-        private final Map<TopicPartition, List<Errors>> errors = new HashMap<>();
+        private final Map<TopicIdPartition, List<Long>> assignedOffsets = new HashMap<>();
+        private final Map<TopicIdPartition, List<Errors>> errors = new HashMap<>();
 
         private final Timer timer;
 
@@ -374,7 +373,7 @@ class WriterPropertyTest {
         }
 
         void handleFinishedRequests() throws ExecutionException, InterruptedException {
-            final List<CompletableFuture<Map<TopicPartition, ProduceResponse.PartitionResponse>>> newWaitingResponseFutures =
+            final List<CompletableFuture<Map<TopicIdPartition, ProduceResponse.PartitionResponse>>> newWaitingResponseFutures =
                 new ArrayList<>();
             for (final var f : waitingResponseFutures) {
                 if (f.isDone()) {
@@ -405,10 +404,10 @@ class WriterPropertyTest {
         }
 
         void checkResponses() {
-            final Map<TopicPartition, List<Long>> expectedAssignedOffsets = new HashMap<>();
+            final Map<TopicIdPartition, List<Long>> expectedAssignedOffsets = new HashMap<>();
             for (final var entry : sentRequests.entrySet()) {
                 final List<Long> offsets = expectedAssignedOffsets
-                    .computeIfAbsent(entry.getKey().topicPartition(), ignore -> new ArrayList<>());
+                    .computeIfAbsent(entry.getKey(), ignore -> new ArrayList<>());
 
                 offsets.add(0L);  // first is always 0
                 for (int i = 0; i < entry.getValue().size() - 1; i++) {
