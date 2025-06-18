@@ -183,7 +183,8 @@ public final class RemoteLogManagerConfig {
     public static final int DEFAULT_REMOTE_LOG_MANAGER_FETCH_QUOTA_WINDOW_SIZE_SECONDS = 1;
 
     public static final String REMOTE_FETCH_MAX_WAIT_MS_PROP = "remote.fetch.max.wait.ms";
-    public static final String REMOTE_FETCH_MAX_WAIT_MS_DOC = "The maximum amount of time the server will wait before answering the remote fetch request";
+    public static final String REMOTE_FETCH_MAX_WAIT_MS_DOC = "The maximum amount of time the server will wait before answering the remote fetch request. " +
+        "Note that the broker currently only fetches one partition per fetch request from the remote store. (KAFKA-14915)";
     public static final int DEFAULT_REMOTE_FETCH_MAX_WAIT_MS = 500;
 
     public static final String REMOTE_LIST_OFFSETS_REQUEST_TIMEOUT_MS_PROP = "remote.list.offsets.request.timeout.ms";
@@ -395,27 +396,37 @@ public final class RemoteLogManagerConfig {
     }
 
     public int remoteLogManagerCopierThreadPoolSize() {
-        int size = config.getInt(REMOTE_LOG_MANAGER_COPIER_THREAD_POOL_SIZE_PROP);
-        return size == -1 ? remoteLogManagerThreadPoolSize() : size;
+        return config.getInt(REMOTE_LOG_MANAGER_COPIER_THREAD_POOL_SIZE_PROP);
     }
 
     public int remoteLogManagerExpirationThreadPoolSize() {
-        int size = config.getInt(REMOTE_LOG_MANAGER_EXPIRATION_THREAD_POOL_SIZE_PROP);
-        return size == -1 ? remoteLogManagerThreadPoolSize() : size;
+        return config.getInt(REMOTE_LOG_MANAGER_EXPIRATION_THREAD_POOL_SIZE_PROP);
     }
 
     public long remoteLogManagerTaskIntervalMs() {
         return config.getLong(REMOTE_LOG_MANAGER_TASK_INTERVAL_MS_PROP);
     }
 
+    /**
+     * Used by the RemoteStorageManager and RemoteLogMetadataManager plugins.
+     */
+    @SuppressWarnings("unused")
     public long remoteLogManagerTaskRetryBackoffMs() {
         return config.getLong(REMOTE_LOG_MANAGER_TASK_RETRY_BACK_OFF_MS_PROP);
     }
 
+    /**
+     * Used by the RemoteStorageManager and RemoteLogMetadataManager plugins.
+     */
+    @SuppressWarnings("unused")
     public long remoteLogManagerTaskRetryBackoffMaxMs() {
         return config.getLong(REMOTE_LOG_MANAGER_TASK_RETRY_BACK_OFF_MAX_MS_PROP);
     }
 
+    /**
+     * Used by the RemoteStorageManager and RemoteLogMetadataManager plugins.
+     */
+    @SuppressWarnings("unused")
     public double remoteLogManagerTaskRetryJitter() {
         return config.getDouble(REMOTE_LOG_MANAGER_TASK_RETRY_JITTER_PROP);
     }
@@ -436,10 +447,18 @@ public final class RemoteLogManagerConfig {
         return config.getInt(REMOTE_LOG_METADATA_CUSTOM_METADATA_MAX_BYTES_PROP);
     }
 
+    /**
+     * Used by the RemoteStorageManager plugin.
+     */
+    @SuppressWarnings("unused")
     public String remoteStorageManagerPrefix() {
         return config.getString(REMOTE_STORAGE_MANAGER_CONFIG_PREFIX_PROP);
     }
 
+    /**
+     * Used by the RemoteLogMetadataManager plugin.
+     */
+    @SuppressWarnings("unused")
     public String remoteLogMetadataManagerPrefix() {
         return config.getString(REMOTE_LOG_METADATA_MANAGER_CONFIG_PREFIX_PROP);
     }
@@ -454,7 +473,7 @@ public final class RemoteLogManagerConfig {
 
     public Map<String, Object> getConfigProps(String configPrefixProp) {
         String prefixProp = config.getString(configPrefixProp);
-        return prefixProp == null ? Collections.emptyMap() : Collections.unmodifiableMap(config.originalsWithPrefix(prefixProp));
+        return prefixProp == null ? Map.of() : Collections.unmodifiableMap(config.originalsWithPrefix(prefixProp));
     }
 
     public int remoteLogManagerCopyNumQuotaSamples() {

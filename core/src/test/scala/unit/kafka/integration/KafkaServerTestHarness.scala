@@ -241,9 +241,9 @@ abstract class KafkaServerTestHarness extends QuorumTestHarness {
         result.exception.ifPresent { e => throw e }
       }
     val aclFilter = new AclBindingFilter(resource.toFilter, AccessControlEntryFilter.ANY)
-    (brokers.map(_.authorizer.get) ++ controllerServers.map(_.authorizer.get)).foreach {
+    (brokers.map(_.authorizerPlugin.get) ++ controllerServers.map(_.authorizerPlugin.get)).foreach {
       authorizer => waitAndVerifyAcls(
-        authorizer.acls(aclFilter).asScala.map(_.entry).toSet ++ acls,
+        authorizer.get.acls(aclFilter).asScala.map(_.entry).toSet ++ acls,
         authorizer, resource)
     }
   }
@@ -257,9 +257,9 @@ abstract class KafkaServerTestHarness extends QuorumTestHarness {
         result.exception.ifPresent { e => throw e }
       }
     val aclFilter = new AclBindingFilter(resource.toFilter, AccessControlEntryFilter.ANY)
-    (brokers.map(_.authorizer.get) ++ controllerServers.map(_.authorizer.get)).foreach {
+    (brokers.map(_.authorizerPlugin.get) ++ controllerServers.map(_.authorizerPlugin.get)).foreach {
       authorizer => waitAndVerifyAcls(
-        authorizer.acls(aclFilter).asScala.map(_.entry).toSet -- acls,
+        authorizer.get.acls(aclFilter).asScala.map(_.entry).toSet -- acls,
         authorizer, resource)
     }
   }

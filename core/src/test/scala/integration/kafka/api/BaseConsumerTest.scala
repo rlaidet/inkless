@@ -16,7 +16,7 @@
  */
 package kafka.api
 
-import kafka.server.QuorumAndGroupProtocolAndMaybeTopicTypeProvider
+import kafka.server.GroupProtocolAndMaybeTopicTypeProvider
 import kafka.utils.TestInfoUtils
 import org.apache.kafka.clients.consumer.{Consumer, ConsumerConfig, GroupProtocol}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig}
@@ -38,9 +38,9 @@ import scala.collection.Seq
  */
 abstract class BaseConsumerTest extends AbstractConsumerTest {
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testSimpleConsumption(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testSimpleConsumption(groupProtocol: String, topicType: String): Unit = {
     val numRecords = 10000
     val producer = createProducer()
     val startingTimestamp = System.currentTimeMillis()
@@ -48,7 +48,7 @@ abstract class BaseConsumerTest extends AbstractConsumerTest {
 
     val consumer = createConsumer()
     assertEquals(0, consumer.assignment.size)
-    consumer.assign(List(tp).asJava)
+    consumer.assign(java.util.List.of(tp))
     assertEquals(1, consumer.assignment.size)
 
     consumer.seek(tp, 0)
@@ -58,9 +58,9 @@ abstract class BaseConsumerTest extends AbstractConsumerTest {
     sendAndAwaitAsyncCommit(consumer)
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testClusterResourceListener(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testClusterResourceListener(groupProtocol: String, topicType: String): Unit = {
     val numRecords = 100
     val producerProps = new Properties()
     producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, classOf[BaseConsumerTest.TestClusterResourceListenerSerializer])
@@ -74,17 +74,17 @@ abstract class BaseConsumerTest extends AbstractConsumerTest {
     consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, classOf[BaseConsumerTest.TestClusterResourceListenerDeserializer])
     consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, classOf[BaseConsumerTest.TestClusterResourceListenerDeserializer])
     val consumer: Consumer[Array[Byte], Array[Byte]] = createConsumer(keyDeserializer = null, valueDeserializer = null, consumerProps)
-    consumer.subscribe(List(tp.topic()).asJava)
+    consumer.subscribe(java.util.List.of(tp.topic()))
     consumeAndVerifyRecords(consumer = consumer, numRecords = numRecords, startingOffset = 0, startingTimestamp = startingTimestamp)
     assertNotEquals(0, BaseConsumerTest.updateProducerCount.get())
     assertNotEquals(0, BaseConsumerTest.updateConsumerCount.get())
   }
 
-  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedQuorumAndGroupProtocolNamesAndTopicType)
-  @ArgumentsSource(classOf[QuorumAndGroupProtocolAndMaybeTopicTypeProvider])
-  def testCoordinatorFailover(quorum: String, groupProtocol: String, topicType: String): Unit = {
+  @ParameterizedTest(name = TestInfoUtils.TestWithParameterizedGroupProtocolNamesAndTopicType)
+  @ArgumentsSource(classOf[GroupProtocolAndMaybeTopicTypeProvider])
+  def testCoordinatorFailover(groupProtocol: String, topicType: String): Unit = {
     val listener = new TestConsumerReassignmentListener()
-    if (groupProtocol.equals(GroupProtocol.CLASSIC.name)) {
+    if (groupProtocol.equalsIgnoreCase(GroupProtocol.CLASSIC.name)) {
       this.consumerConfig.setProperty(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "5001")
       this.consumerConfig.setProperty(ConsumerConfig.HEARTBEAT_INTERVAL_MS_CONFIG, "1000")
     }
@@ -92,7 +92,7 @@ abstract class BaseConsumerTest extends AbstractConsumerTest {
     this.consumerConfig.setProperty(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, "15000")
     val consumer = createConsumer()
 
-    consumer.subscribe(List(topic).asJava, listener)
+    consumer.subscribe(java.util.List.of(topic), listener)
 
     // the initial subscription should cause a callback execution
     awaitRebalance(consumer, listener)
