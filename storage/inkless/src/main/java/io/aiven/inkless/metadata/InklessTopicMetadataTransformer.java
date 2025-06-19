@@ -17,9 +17,10 @@
  */
 package io.aiven.inkless.metadata;
 
-import org.apache.kafka.admin.BrokerMetadata;
+import org.apache.kafka.common.Node;
 import org.apache.kafka.common.message.DescribeTopicPartitionsResponseData;
 import org.apache.kafka.common.message.MetadataResponseData;
+import org.apache.kafka.common.network.ListenerName;
 import org.apache.kafka.metadata.LeaderAndIsr;
 
 import java.util.Collections;
@@ -44,12 +45,13 @@ public class InklessTopicMetadataTransformer {
      * @param clientId client ID, {@code null} if not provided.
      */
     public void transformClusterMetadata(
+        final ListenerName listenerName,
         final String clientId,
         final Iterable<MetadataResponseData.MetadataResponseTopic> topicMetadata
     ) {
         Objects.requireNonNull(topicMetadata, "topicMetadata cannot be null");
 
-        final int leaderForInklessPartitions = selectLeaderForInklessPartitions(clientId);
+        final int leaderForInklessPartitions = selectLeaderForInklessPartitions(listenerName, clientId);
         for (final var topic : topicMetadata) {
             if (!metadataView.isInklessTopic(topic.name())) {
                 continue;
@@ -69,12 +71,13 @@ public class InklessTopicMetadataTransformer {
      * @param clientId client ID, {@code null} if not provided.
      */
     public void transformDescribeTopicResponse(
+        final ListenerName listenerName,
         final String clientId,
         final DescribeTopicPartitionsResponseData responseData
     ) {
         Objects.requireNonNull(responseData, "responseData cannot be null");
 
-        final int leaderForInklessPartitions = selectLeaderForInklessPartitions(clientId);
+        final int leaderForInklessPartitions = selectLeaderForInklessPartitions(listenerName, clientId);
         for (final var topic : responseData.topics()) {
             if (!metadataView.isInklessTopic(topic.name())) {
                 continue;
@@ -101,13 +104,13 @@ public class InklessTopicMetadataTransformer {
      *
      * @return the selected broker ID.
      */
-    private int selectLeaderForInklessPartitions(final String clientId) {
+    private int selectLeaderForInklessPartitions(final ListenerName listenerName, final String clientId) {
         final String clientAZ = ClientAZExtractor.getClientAZ(clientId);
         // This gracefully handles the null client AZ, no need for a special check.
-        final List<BrokerMetadata> brokersInClientAZ = brokersInAZ(clientAZ);
+        final List<Node> brokersInClientAZ = brokersInAZ(listenerName, clientAZ);
         // Fall back on all brokers if no broker in the client AZ.
-        final List<BrokerMetadata> brokersToPickFrom = brokersInClientAZ.isEmpty()
-            ? allAliveBrokers()
+        final List<Node> brokersToPickFrom = brokersInClientAZ.isEmpty()
+            ? allAliveBrokers(listenerName)
             : brokersInClientAZ;
 
         // This cannot happen in a normal broker run. This will serve as a guard in tests.
@@ -117,12 +120,12 @@ public class InklessTopicMetadataTransformer {
 
         final int c = roundRobinCounter.getAndUpdate(v -> Math.max(v + 1, 0));
         final int idx = c % brokersToPickFrom.size();
-        return brokersToPickFrom.get(idx).id;
+        return brokersToPickFrom.get(idx).id();
     }
 
-    private List<BrokerMetadata> allAliveBrokers() {
-        return StreamSupport.stream(metadataView.getAliveBrokers().spliterator(), false)
-            .sorted(Comparator.comparing(bm -> bm.id))
+    private List<Node> allAliveBrokers(final ListenerName listenerName) {
+        return StreamSupport.stream(metadataView.getAliveBrokerNodes(listenerName).spliterator(), false)
+            .sorted(Comparator.comparing(Node::id))
             .toList();
     }
 
@@ -131,10 +134,10 @@ public class InklessTopicMetadataTransformer {
      *
      * @param az the AZ to look for, can be {@code null}.
      */
-    private List<BrokerMetadata> brokersInAZ(final String az) {
-        return StreamSupport.stream(metadataView.getAliveBrokers().spliterator(), false)
-            .filter(bm -> Objects.equals(bm.rack.orElse(null), az))
-            .sorted(Comparator.comparing(bm -> bm.id))
+    private List<Node> brokersInAZ(final ListenerName listenerName, final String az) {
+        return StreamSupport.stream(metadataView.getAliveBrokerNodes(listenerName).spliterator(), false)
+            .filter(bm -> Objects.equals(bm.rack(), az))
+            .sorted(Comparator.comparing(Node::id))
             .toList();
     }
 }

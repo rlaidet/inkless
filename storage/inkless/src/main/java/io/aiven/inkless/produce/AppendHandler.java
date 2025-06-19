@@ -18,7 +18,6 @@
 package io.aiven.inkless.produce;
 
 import org.apache.kafka.common.TopicIdPartition;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.requests.ProduceResponse.PartitionResponse;
@@ -36,11 +35,11 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import io.aiven.inkless.common.SharedState;
-import io.aiven.inkless.common.TopicIdEnricher;
 
 public class AppendHandler implements Closeable {
     private static final Logger LOGGER = LoggerFactory.getLogger(AppendHandler.class);
@@ -89,7 +88,7 @@ public class AppendHandler implements Closeable {
      *
      * @return {@code true} if interception happened
      */
-    public CompletableFuture<Map<TopicPartition, PartitionResponse>> handle(final Map<TopicPartition, MemoryRecords> entriesPerPartition,
+    public CompletableFuture<Map<TopicIdPartition, PartitionResponse>> handle(final Map<TopicIdPartition, MemoryRecords> entriesPerPartition,
                                                                             final RequestLocal requestLocal) {
         if (entriesPerPartition.isEmpty()) {
             return CompletableFuture.completedFuture(Collections.emptyMap());
@@ -102,19 +101,10 @@ public class AppendHandler implements Closeable {
             );
         }
 
-        final Map<TopicIdPartition, MemoryRecords> entriesPerPartitionEnriched;
-        try {
-            entriesPerPartitionEnriched = TopicIdEnricher.enrich(state.metadata(), entriesPerPartition);
-        } catch (final TopicIdEnricher.TopicIdNotFoundException e) {
-            LOGGER.error("Cannot find UUID for topic {}", e.topicName);
-            return CompletableFuture.completedFuture(entriesPerPartition.entrySet().stream().collect(
-                Collectors.toMap(Map.Entry::getKey, ignore -> new PartitionResponse(Errors.UNKNOWN_SERVER_ERROR)))
-            );
-        }
-        return writer.write(entriesPerPartitionEnriched, getLogConfigs(entriesPerPartition), requestLocal);
+        return writer.write(entriesPerPartition, getLogConfigs(entriesPerPartition.keySet()), requestLocal);
     }
 
-    private boolean requestContainsTransactionalProduce(final Map<TopicPartition, MemoryRecords> entriesPerPartition) {
+    private boolean requestContainsTransactionalProduce(final Map<TopicIdPartition, MemoryRecords> entriesPerPartition) {
         return entriesPerPartition.values().stream().anyMatch(records -> {
             for (final var batch : records.batches()) {
                 if (batch.hasProducerId() && batch.isTransactional()) {
@@ -125,10 +115,10 @@ public class AppendHandler implements Closeable {
         });
     }
 
-    private Map<String, LogConfig> getLogConfigs(final Map<TopicPartition, MemoryRecords> entriesPerPartition) {
+    private Map<String, LogConfig> getLogConfigs(final Set<TopicIdPartition> topicIdPartitions) {
         final Map<String, Object> defaultTopicConfigs = state.defaultTopicConfigs().get().originals();
         final Map<String, LogConfig> result = new HashMap<>();
-        for (final TopicPartition tp : entriesPerPartition.keySet()) {
+        for (final TopicIdPartition tp : topicIdPartitions) {
             final var overrides = state.metadata().getTopicConfig(tp.topic());
             result.put(tp.topic(), LogConfig.fromProps(defaultTopicConfigs, overrides));
         }

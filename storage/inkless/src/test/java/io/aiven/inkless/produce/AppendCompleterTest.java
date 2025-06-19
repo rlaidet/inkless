@@ -18,7 +18,6 @@
 package io.aiven.inkless.produce;
 
 import org.apache.kafka.common.TopicIdPartition;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.protocol.Errors;
@@ -77,7 +76,7 @@ class AppendCompleterTest {
 
     @Test
     void commitFinishedSuccessfully() throws Exception {
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );
@@ -95,12 +94,12 @@ class AppendCompleterTest {
         job.finishCommitSuccessfully(commitBatchResponses);
 
         assertThat(awaitingFuturesByRequest.get(0)).isCompletedWithValue(Map.of(
-            T0P0.topicPartition(), new PartitionResponse(Errors.NONE, 0, -1, 0),
-            T0P1.topicPartition(), new PartitionResponse(Errors.INVALID_TOPIC_EXCEPTION, -1, -1, -1)
+            T0P0, new PartitionResponse(Errors.NONE, 0, -1, 0),
+            T0P1, new PartitionResponse(Errors.INVALID_TOPIC_EXCEPTION, -1, -1, -1)
         ));
         assertThat(awaitingFuturesByRequest.get(1)).isCompletedWithValue(Map.of(
-            T0P1.topicPartition(), new PartitionResponse(Errors.NONE, 20, -1, 0),
-            T1P0.topicPartition(), new PartitionResponse(Errors.NONE, 30, 10, 0)
+            T0P1, new PartitionResponse(Errors.NONE, 20, -1, 0),
+            T1P0, new PartitionResponse(Errors.NONE, 30, 10, 0)
         ));
     }
 
@@ -108,7 +107,7 @@ class AppendCompleterTest {
     void commitFinishedSuccessfullyZeroBatches() {
         // We sent two requests, both without any batch.
 
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );
@@ -129,19 +128,19 @@ class AppendCompleterTest {
     void requestContainedOnlyInvalidRequests() {
         // We sent two requests, both without any batch.
 
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
                 0, new CompletableFuture<>(),
                 1, new CompletableFuture<>()
         );
         // All partitions within these requests contained validation errors
-        Map<Integer, Map<TopicPartition, PartitionResponse>> invalidResponses = Map.of(
+        Map<Integer, Map<TopicIdPartition, PartitionResponse>> invalidResponses = Map.of(
             0, Map.of(
-                T0P0.topicPartition(), new PartitionResponse(Errors.INVALID_TIMESTAMP, -1, -1, -1),
-                T0P1.topicPartition(), new PartitionResponse(Errors.INVALID_TOPIC_EXCEPTION, -1, -1, -1)
+                T0P0, new PartitionResponse(Errors.INVALID_TIMESTAMP, -1, -1, -1),
+                T0P1, new PartitionResponse(Errors.INVALID_TOPIC_EXCEPTION, -1, -1, -1)
             ),
             1, Map.of(
-                T0P1.topicPartition(), new PartitionResponse(Errors.CORRUPT_MESSAGE, -1, -1, -1),
-                T1P0.topicPartition(), new PartitionResponse(Errors.INVALID_RECORD, -1, -1, -1)
+                T0P1, new PartitionResponse(Errors.CORRUPT_MESSAGE, -1, -1, -1),
+                T1P0, new PartitionResponse(Errors.INVALID_RECORD, -1, -1, -1)
             )
         );
 
@@ -153,18 +152,18 @@ class AppendCompleterTest {
         job.finishCommitSuccessfully(commitBatchResponses);
 
         assertThat(awaitingFuturesByRequest.get(0)).isCompletedWithValue(Map.of(
-                T0P0.topicPartition(), new PartitionResponse(Errors.INVALID_TIMESTAMP, -1, -1, -1),
-                T0P1.topicPartition(), new PartitionResponse(Errors.INVALID_TOPIC_EXCEPTION, -1, -1, -1)
+                T0P0, new PartitionResponse(Errors.INVALID_TIMESTAMP, -1, -1, -1),
+                T0P1, new PartitionResponse(Errors.INVALID_TOPIC_EXCEPTION, -1, -1, -1)
         ));
         assertThat(awaitingFuturesByRequest.get(1)).isCompletedWithValue(Map.of(
-                T0P1.topicPartition(), new PartitionResponse(Errors.CORRUPT_MESSAGE, -1, -1, -1),
-                T1P0.topicPartition(), new PartitionResponse(Errors.INVALID_RECORD, -1, -1, -1)
+                T0P1, new PartitionResponse(Errors.CORRUPT_MESSAGE, -1, -1, -1),
+                T1P0, new PartitionResponse(Errors.INVALID_RECORD, -1, -1, -1)
         ));
     }
 
     @Test
     void commitFinishedWithError() {
-        final Map<Integer, CompletableFuture<Map<TopicPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
+        final Map<Integer, CompletableFuture<Map<TopicIdPartition, PartitionResponse>>> awaitingFuturesByRequest = Map.of(
             0, new CompletableFuture<>(),
             1, new CompletableFuture<>()
         );
@@ -175,12 +174,12 @@ class AppendCompleterTest {
         job.finishCommitWithError();
 
         assertThat(awaitingFuturesByRequest.get(0)).isCompletedWithValue(Map.of(
-            T0P0.topicPartition(), new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data"),
-            T0P1.topicPartition(), new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data")
+            T0P0, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data"),
+            T0P1, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data")
         ));
         assertThat(awaitingFuturesByRequest.get(1)).isCompletedWithValue(Map.of(
-            T0P1.topicPartition(), new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data"),
-            T1P0.topicPartition(), new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data")
+            T0P1, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data"),
+            T1P0, new PartitionResponse(Errors.KAFKA_STORAGE_ERROR, "Error commiting data")
         ));
     }
 }

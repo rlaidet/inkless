@@ -21,6 +21,7 @@ import org.apache.kafka.common.network.TransferableChannel;
 import org.apache.kafka.common.record.AbstractRecords;
 import org.apache.kafka.common.record.MemoryRecords;
 import org.apache.kafka.common.record.MutableRecordBatch;
+import org.apache.kafka.common.record.Records;
 import org.apache.kafka.common.utils.AbstractIterator;
 import org.apache.kafka.common.utils.FlattenedIterator;
 
@@ -50,6 +51,12 @@ public class ConcatenatedRecords extends AbstractRecords {
     @Override
     public AbstractIterator<MutableRecordBatch> batchIterator() {
         return new FlattenedIterator<>(backingRecords.iterator(), MemoryRecords::batchIterator);
+    }
+
+    @Override
+    public Records slice(int position, int size) {
+        // TODO: this could be required to support ShareGroup feature
+        throw new UnsupportedOperationException("Slice operation is not supported for ConcatenatedRecords");
     }
 
     @Override

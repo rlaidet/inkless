@@ -18,7 +18,6 @@
 package io.aiven.inkless.merge;
 
 import org.apache.kafka.common.TopicIdPartition;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.message.ApiMessageType;
 import org.apache.kafka.common.protocol.Errors;
@@ -160,7 +159,6 @@ class FileMergerIntegrationTest {
     void setup() {
         for (final var entry : TOPICS.entrySet()) {
             when(metadataView.isInklessTopic(entry.getKey())).thenReturn(true);
-            when(metadataView.getTopicId(entry.getKey())).thenReturn(entry.getValue());
         }
         when(metadataView.getTopicConfig(anyString())).thenReturn(new Properties());
         when(defaultTopicConfigs.get()).thenReturn(new LogConfig(Map.of()));
@@ -257,14 +255,14 @@ class FileMergerIntegrationTest {
 
     private void writeRecords(final AppendHandler appendHandler) {
         final WriterTestUtils.RecordCreator recordCreator = new WriterTestUtils.RecordCreator();
-        var futures = new ArrayList<CompletableFuture<Map<TopicPartition, ProduceResponse.PartitionResponse>>>();
+        var futures = new ArrayList<CompletableFuture<Map<TopicIdPartition, ProduceResponse.PartitionResponse>>>();
 
         for (int i = 0; i < WRITE_ITERATIONS; i++) {
-            final HashMap<TopicPartition, MemoryRecords> records = new HashMap<>();
+            final HashMap<TopicIdPartition, MemoryRecords> records = new HashMap<>();
             for (int tpi = 0; tpi < ALL_TOPIC_ID_PARTITIONS.size(); tpi++) {
                 if (i % (tpi + 1) == 0) {
                     final TopicIdPartition tidp = ALL_TOPIC_ID_PARTITIONS.get(tpi);
-                    records.put(tidp.topicPartition(), recordCreator.create(tidp.topicPartition(), i));
+                    records.put(tidp, recordCreator.create(tidp.topicPartition(), i));
                 }
             }
             futures.add(appendHandler.handle(records, RequestLocal.noCaching()));

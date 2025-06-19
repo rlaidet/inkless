@@ -238,7 +238,7 @@ class UnifiedLog {
         final LogConfig config,
         final MemoryRecords records,
         final BatchBuffer buffer,
-        final Map<TopicPartition, ProduceResponse.PartitionResponse> invalidBatches,
+        final Map<TopicIdPartition, ProduceResponse.PartitionResponse> invalidBatches,
         final RequestLocal requestLocal,
         final BrokerTopicStats brokerTopicStats,
         final LogValidator.MetricsRecorder validatorMetricsRecorder
@@ -256,7 +256,7 @@ class UnifiedLog {
 
         if (appendInfo.validBytes() <= 0) {
             // Reply with empty response for empty batches
-            invalidBatches.put(topicIdPartition.topicPartition(), new ProduceResponse.PartitionResponse(Errors.NONE));
+            invalidBatches.put(topicIdPartition, new ProduceResponse.PartitionResponse(Errors.NONE));
         } else {
             MemoryRecords validRecords = trimInvalidBytes(topicIdPartition.topicPartition(), records, appendInfo);
 

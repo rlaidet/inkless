@@ -17,8 +17,6 @@
 
 package kafka.server.metadata;
 
-import kafka.server.MetadataCache;
-
 import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.metadata.ConfigRecord;
 import org.apache.kafka.common.protocol.ApiMessage;
@@ -34,10 +32,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
-
-import scala.collection.Map;
-import scala.jdk.javaapi.CollectionConverters;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -57,13 +53,10 @@ class InklessKRaftMetadataCacheTest {
         "regular_topic_disabled,false,false", "regular_topic_disabled,true,false",
     })
     void isInklessTopic(final String topicName, final boolean defaultInklessEnable, final boolean expectedIsInkless) {
-        Supplier<Map<String, ?>> defaultConfig = () -> CollectionConverters.asScala(
-            defaultInklessEnable ?
-                Collections.singletonMap(TopicConfig.INKLESS_ENABLE_CONFIG, "true") :
-                Collections.emptyMap()
-        );
+        Supplier<Map<String, Object>> defaultConfig = () ->
+            defaultInklessEnable ? Collections.singletonMap(TopicConfig.INKLESS_ENABLE_CONFIG, "true") : Collections.emptyMap();
         // Given a cache with a couple of inkless topics
-        final KRaftMetadataCache cache = MetadataCache.kRaftMetadataCache(1, () -> KRaftVersion.KRAFT_VERSION_0);
+        final KRaftMetadataCache cache = new KRaftMetadataCache(1, () -> KRaftVersion.KRAFT_VERSION_0);
         final List<ApiMessage> configRecords = List.of(
             new ConfigRecord()
                 .setResourceType(ResourceType.TOPIC.code())

@@ -205,7 +205,7 @@ class ActiveFileTest {
             CommitBatchRequest.of(1, T1P0, 156, 78, 0, 0, time.milliseconds(), TimestampType.LOG_APPEND_TIME)
         );
         assertThat(result.invalidResponseByRequest().get(0))
-            .containsExactly(Map.entry(T0P1.topicPartition(), new ProduceResponse.PartitionResponse(Errors.INVALID_RECORD)));
+            .containsExactly(Map.entry(T0P1, new ProduceResponse.PartitionResponse(Errors.INVALID_RECORD)));
         assertThat(result.data()).hasSize(312 - 78); // 78 bytes of the invalid batch
     }
 }
