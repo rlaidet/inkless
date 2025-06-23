@@ -27,11 +27,16 @@ import java.util.Properties
 import java.util.function.Supplier
 import java.{lang, util}
 import scala.collection.Map
-import scala.jdk.CollectionConverters.{IterableHasAsJava, MapHasAsJava, SetHasAsJava}
+import scala.jdk.CollectionConverters.{IterableHasAsJava, SetHasAsJava}
 
 class InklessMetadataView(val metadataCache: KRaftMetadataCache, val defaultConfig: Supplier[Map[String, _]]) extends MetadataView {
   override def getDefaultConfig: util.Map[String, AnyRef] = {
-    defaultConfig.get().asJava.asInstanceOf[util.Map[String, AnyRef]]
+    // Filter out null values as they break LogConfig initialization using Properties.putAll
+    val filtered = new util.HashMap[String, Object]()
+    defaultConfig.get().asInstanceOf[Map[String, AnyRef]]
+      .filter(_._2 != null)
+      .foreach(entry => filtered.put(entry._1, entry._2))
+    filtered
   }
 
   override def getAliveBrokers: lang.Iterable[BrokerMetadata] = {
