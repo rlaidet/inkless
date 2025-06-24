@@ -24,17 +24,18 @@ import org.mockito.Mockito._
 
 import java.util.{HashMap => JHashMap}
 import java.util.function.Supplier
-import java.util
+import scala.collection.Map
+import scala.jdk.CollectionConverters.MapHasAsScala
 
 class InklessMetadataViewTest {
   private var metadataCache: KRaftMetadataCache = _
-  private var configSupplier: Supplier[util.Map[String, Object]] = _
+  private var configSupplier: Supplier[Map[String, Object]] = _
   private var metadataView: InklessMetadataView = _
 
   @BeforeEach
   def setup(): Unit = {
     metadataCache = mock(classOf[KRaftMetadataCache])
-    configSupplier = mock(classOf[Supplier[util.Map[String, Object]]])
+    configSupplier = mock(classOf[Supplier[Map[String, AnyRef]]])
     metadataView = new InklessMetadataView(metadataCache, configSupplier)
   }
 
@@ -48,7 +49,7 @@ class InklessMetadataViewTest {
     originalConfig.put("key4", null)
 
     // Configure the mock to return our test map
-    when(configSupplier.get()).thenReturn(originalConfig)
+    when(configSupplier.get()).thenReturn(originalConfig.asScala)
 
     // Call the method under test
     val filteredConfig = metadataView.getDefaultConfig
@@ -71,7 +72,7 @@ class InklessMetadataViewTest {
     originalConfig.put("key2", "value2")
 
     // Configure the mock to return our test map
-    when(configSupplier.get()).thenReturn(originalConfig)
+    when(configSupplier.get()).thenReturn(originalConfig.asScala)
 
     // Call the method under test
     val filteredConfig = metadataView.getDefaultConfig
@@ -88,7 +89,7 @@ class InklessMetadataViewTest {
     val originalConfig = new JHashMap[String, Object]()
 
     // Configure the mock to return our test map
-    when(configSupplier.get()).thenReturn(originalConfig)
+    when(configSupplier.get()).thenReturn(originalConfig.asScala)
 
     // Call the method under test
     val filteredConfig = metadataView.getDefaultConfig

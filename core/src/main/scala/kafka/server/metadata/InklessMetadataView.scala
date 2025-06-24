@@ -29,11 +29,11 @@ import java.{lang, util}
 import scala.collection.Map
 import scala.jdk.CollectionConverters.{IterableHasAsJava, SetHasAsJava}
 
-class InklessMetadataView(val metadataCache: KRaftMetadataCache, val defaultConfig: Supplier[Map[String, _]]) extends MetadataView {
+class InklessMetadataView(val metadataCache: KRaftMetadataCache, val defaultConfig: Supplier[Map[String, AnyRef]]) extends MetadataView {
   override def getDefaultConfig: util.Map[String, AnyRef] = {
     // Filter out null values as they break LogConfig initialization using Properties.putAll
     val filtered = new util.HashMap[String, Object]()
-    defaultConfig.get().asInstanceOf[Map[String, AnyRef]]
+    defaultConfig.get()
       .filter(_._2 != null)
       .foreach(entry => filtered.put(entry._1, entry._2))
     filtered

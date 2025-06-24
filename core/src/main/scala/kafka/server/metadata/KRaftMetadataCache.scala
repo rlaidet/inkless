@@ -556,7 +556,7 @@ class KRaftMetadataCache(
       true)
   }
 
-  override def isInklessTopic(topic: String, defaultConfig: Supplier[Map[String, _]]): Boolean = {
+  def isInklessTopic(topic: String, defaultConfig: Supplier[Map[String, AnyRef]]): Boolean = {
     val topicConfigs = topicConfig(topic)
     // avoid instantiating LogConfig as it is expensive
     val defaultInklessEnable = defaultConfig.get().getOrElse(TopicConfig.INKLESS_ENABLE_CONFIG, "false").toString.toBoolean

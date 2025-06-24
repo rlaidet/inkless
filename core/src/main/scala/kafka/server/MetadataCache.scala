@@ -119,8 +119,6 @@ trait MetadataCache {
   def getRandomAliveBrokerId: Option[Int]
 
   def features(): FinalizedFeatures
-
-  def isInklessTopic(topic: String, defaultConfig: Supplier[Map[String, _]]): Boolean
 }
 
 object MetadataCache {
