@@ -23,6 +23,7 @@ import org.apache.kafka.metadata.BrokerRegistration;
 import org.apache.kafka.metadata.PartitionRegistration;
 
 import java.util.Map.Entry;
+import java.util.function.Function;
 
 
 /**
@@ -30,6 +31,17 @@ import java.util.Map.Entry;
  * metrics changes triggered by a series of deltas.
  */
 class ControllerMetricsChanges {
+
+    private final Function<String, Boolean> isInklessTopic;
+
+    ControllerMetricsChanges() {
+        this.isInklessTopic = topicName -> false; // Default implementation, can be overridden
+    }
+
+    ControllerMetricsChanges(Function<String, Boolean> isInklessTopic) {
+        this.isInklessTopic = isInklessTopic;
+    }
+
     /**
      * Calculates the change between two boolean values, expressed as an integer.
      */
@@ -91,26 +103,28 @@ class ControllerMetricsChanges {
     }
 
     void handleDeletedTopic(TopicImage deletedTopic) {
-        deletedTopic.partitions().values().forEach(prev -> handlePartitionChange(prev, null));
+        deletedTopic.partitions().values().forEach(prev -> handlePartitionChange(prev, null, isInklessTopic.apply(deletedTopic.name())));
         globalTopicsChange--;
     }
 
     void handleTopicChange(TopicImage prev, TopicDelta topicDelta) {
+        final Boolean isInkless = isInklessTopic.apply(topicDelta.name());
         if (prev == null) {
             globalTopicsChange++;
             for (PartitionRegistration nextPartition : topicDelta.partitionChanges().values()) {
-                handlePartitionChange(null, nextPartition);
+                handlePartitionChange(null, nextPartition, isInkless);
             }
         } else {
             for (Entry<Integer, PartitionRegistration> entry : topicDelta.partitionChanges().entrySet()) {
                 int partitionId = entry.getKey();
+                PartitionRegistration prevPartition = prev.partitions().get(partitionId);
                 PartitionRegistration nextPartition = entry.getValue();
-                handlePartitionChange(prev.partitions().get(partitionId), nextPartition);
+                handlePartitionChange(prevPartition, nextPartition, isInkless);
             }
         }
     }
 
-    void handlePartitionChange(PartitionRegistration prev, PartitionRegistration next) {
+    void handlePartitionChange(PartitionRegistration prev, PartitionRegistration next, boolean isInkless) {
         boolean wasPresent = false;
         boolean wasOffline = false;
         boolean wasWithoutPreferredLeader = false;
@@ -118,6 +132,11 @@ class ControllerMetricsChanges {
             wasPresent = true;
             wasOffline = !prev.hasLeader();
             wasWithoutPreferredLeader = !prev.hasPreferredLeader();
+        }
+        if (isInkless) {
+            wasPresent = true;
+            wasOffline = false; // Inkless partitions are always considered online
+            wasWithoutPreferredLeader = false; // Inkless partitions are always considered to have a preferred leader
         }
         boolean isPresent = false;
         boolean isOffline = false;
@@ -132,6 +151,11 @@ class ControllerMetricsChanges {
             if (!PartitionRegistration.electionWasClean(next.leader, prevIsr, prevElr)) {
                 uncleanLeaderElection++;
             }
+        }
+        if (isInkless) {
+            isPresent = true;
+            isOffline = false; // Inkless partitions are always considered online
+            isWithoutPreferredLeader = false; // Inkless partitions are always considered to have a preferred leader
         }
         globalPartitionsChange += delta(wasPresent, isPresent);
         offlinePartitionsChange += delta(wasOffline, isOffline);
