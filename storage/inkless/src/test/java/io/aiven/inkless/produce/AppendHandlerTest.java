@@ -60,6 +60,7 @@ import io.aiven.inkless.control_plane.MetadataView;
 import io.aiven.inkless.storage_backend.common.StorageBackend;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
@@ -128,7 +129,7 @@ public class AppendHandlerTest {
     );
 
     @Test
-    public void rejectTransactionalProduce() {
+    public void rejectTransactionalProduce() throws Exception {
         final AppendHandler interceptor = new AppendHandler(
             new SharedState(time, BROKER_ID, inklessConfig, metadataView, controlPlane, storageBackend,
                 OBJECT_KEY_CREATOR, KEY_ALIGNMENT_STRATEGY, OBJECT_CACHE, brokerTopicStats, DEFAULT_TOPIC_CONFIGS), writer);
@@ -138,13 +139,13 @@ public class AppendHandlerTest {
             new TopicPartition("inkless2", 0), TRANSACTIONAL_RECORDS
         );
 
-        interceptor.handle(entriesPerPartition, requestLocal)
-            .whenComplete((r, ex) -> assertThat(r).isEqualTo(
-                Map.of(
-                    new TopicPartition("inkless1", 0), new PartitionResponse(Errors.INVALID_REQUEST),
-                    new TopicPartition("inkless2", 0), new PartitionResponse(Errors.INVALID_REQUEST)
-                )
-            ));
+        final var result = interceptor.handle(entriesPerPartition, requestLocal).get();
+        assertThat(result).isEqualTo(
+            Map.of(
+                new TopicPartition("inkless1", 0), new PartitionResponse(Errors.INVALID_REQUEST),
+                new TopicPartition("inkless2", 0), new PartitionResponse(Errors.INVALID_REQUEST)
+            )
+        );
         verify(writer, never()).write(any(), anyMap(), any());
     }
 
@@ -163,7 +164,7 @@ public class AppendHandlerTest {
     }
 
     @Test
-    public void acceptNotTransactionalProduceForInklessTopics() {
+    public void acceptNotTransactionalProduceForInklessTopics() throws Exception {
         final Map<TopicPartition, MemoryRecords> entriesPerPartition = Map.of(
             new TopicPartition("inkless", 0), RECORDS_WITHOUT_PRODUCER_ID
         );
@@ -181,8 +182,8 @@ public class AppendHandlerTest {
             new SharedState(time, BROKER_ID, inklessConfig, metadataView, controlPlane, storageBackend,
                 OBJECT_KEY_CREATOR, KEY_ALIGNMENT_STRATEGY, OBJECT_CACHE, brokerTopicStats, DEFAULT_TOPIC_CONFIGS), writer);
 
-        final var futureResult = interceptor.handle(entriesPerPartition, requestLocal);
-        futureResult.whenComplete((r, ex) -> assertThat(r).isEqualTo(writeResult));
+        final var result = interceptor.handle(entriesPerPartition, requestLocal).get();
+        assertThat(result).isEqualTo(writeResult);
     }
 
     @Test
@@ -226,11 +227,7 @@ public class AppendHandlerTest {
             new SharedState(time, BROKER_ID, inklessConfig, metadataView, controlPlane, storageBackend,
                 OBJECT_KEY_CREATOR, KEY_ALIGNMENT_STRATEGY, OBJECT_CACHE, brokerTopicStats, DEFAULT_TOPIC_CONFIGS), writer);
 
-        final var futureResult = interceptor.handle(entriesPerPartition, requestLocal);
-        futureResult.whenComplete((r, ex) -> {
-            assertThat(r).isEqualTo(null);
-            assertThat(ex).isEqualTo(exception);
-        });
+        assertThatThrownBy(() -> interceptor.handle(entriesPerPartition, requestLocal).get()).hasCause(exception);
     }
 
     @Test
