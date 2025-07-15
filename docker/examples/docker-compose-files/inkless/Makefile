@@ -1,12 +1,14 @@
 DOCKER := docker
 
+KAFKA_VERSION ?= 4.1.0-inkless-SNAPSHOT
+
 .PHONY: in-memory
 in-memory:
 	docker compose -f docker-compose.yml -f docker-compose.monitoring.yml -f docker-compose.demo.yml up
 	$(MAKE) destroy
 
 .PHONY: s3-local
-s3-minio:
+s3-local:
 	$(DOCKER) compose -f docker-compose.yml -f docker-compose.monitoring.yml -f docker-compose.demo.yml -f docker-compose.s3-local.yml up
 	$(MAKE) destroy
 
