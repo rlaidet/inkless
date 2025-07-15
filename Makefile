@@ -8,6 +8,7 @@ build:
 	./gradlew :core:build :storage:inkless:build :metadata:build -x test
 
 core/build/distributions/kafka_2.13-$(VERSION).tgz:
+	echo "Building Kafka distribution with version $(VERSION)"
 	./gradlew releaseTarGz
 
 .PHONY: build_release
@@ -65,7 +66,7 @@ clean:
 DEMO := s3-local
 .PHONY: demo
 demo:
-	$(MAKE) -C docker/examples/docker-compose-files/inkless $(DEMO)
+	$(MAKE) -C docker/examples/docker-compose-files/inkless $(DEMO) KAFKA_VERSION=$(VERSION)
 
 core/build/distributions/kafka_2.13-$(VERSION): core/build/distributions/kafka_2.13-$(VERSION).tgz
 	tar -xf $< -C core/build/distributions
