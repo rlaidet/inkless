@@ -40,6 +40,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
@@ -155,6 +156,8 @@ class FileMergerIntegrationTest {
 
     ControlPlane controlPlane;
     SharedState sharedState;
+    @TempDir
+    Path logDir;
 
     @BeforeEach
     void setup() {
@@ -199,7 +202,7 @@ class FileMergerIntegrationTest {
         final InklessConfig inklessConfig = new InklessConfig(config);
 
         sharedState = SharedState.initialize(time, "cluster-id", "az1", BROKER_ID, inklessConfig,
-            metadataView, controlPlane, new BrokerTopicStats(), defaultTopicConfigs);
+            metadataView, controlPlane, new BrokerTopicStats(), logDir, defaultTopicConfigs);
 
         createTopics(controlPlane);
 
