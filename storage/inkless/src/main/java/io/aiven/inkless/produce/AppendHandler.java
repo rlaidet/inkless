@@ -78,10 +78,6 @@ public class AppendHandler implements Closeable {
         this.writer = writer;
     }
 
-    public boolean isInkless(String topicName) {
-        return this.state.metadata().isInklessTopic(topicName);
-    }
-
     /**
      * Intercept an attempt to append records.
      *
