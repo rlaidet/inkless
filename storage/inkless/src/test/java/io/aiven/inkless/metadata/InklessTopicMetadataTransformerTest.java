@@ -149,7 +149,7 @@ class InklessTopicMetadataTransformerTest {
                             .setLeaderEpoch(0),
                         new MetadataResponsePartition()
                             .setPartitionIndex(1)
-                            .setErrorCode((short) 1)
+                            .setErrorCode((short) 0)
                             .setLeaderId(-1)
                             .setReplicaNodes(List.of(1, 2, 3, 4))
                             .setIsrNodes(List.of(1, 2))
@@ -157,7 +157,7 @@ class InklessTopicMetadataTransformerTest {
                             .setLeaderEpoch(0),
                         new MetadataResponsePartition()
                             .setPartitionIndex(2)
-                            .setErrorCode((short) 2)
+                            .setErrorCode((short) 0)
                             .setLeaderId(-1)
                             .setReplicaNodes(List.of(1, 2, 3, 4))
                             .setIsrNodes(List.of(1, 2))
@@ -233,7 +233,7 @@ class InklessTopicMetadataTransformerTest {
                             .setLeaderEpoch(0),
                         new DescribeTopicPartitionsResponsePartition()
                             .setPartitionIndex(1)
-                            .setErrorCode((short) 1)
+                            .setErrorCode((short) 0)
                             .setLeaderId(-1)
                             .setReplicaNodes(List.of(1, 2, 3, 4))
                             .setIsrNodes(List.of(1, 2))
@@ -243,7 +243,7 @@ class InklessTopicMetadataTransformerTest {
                             .setLeaderEpoch(0),
                         new DescribeTopicPartitionsResponsePartition()
                             .setPartitionIndex(2)
-                            .setErrorCode((short) 2)
+                            .setErrorCode((short) 0)
                             .setLeaderId(-1)
                             .setReplicaNodes(List.of(1, 2, 3, 4))
                             .setIsrNodes(List.of(1, 2))
