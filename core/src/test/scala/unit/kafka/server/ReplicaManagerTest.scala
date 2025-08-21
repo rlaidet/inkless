@@ -31,6 +31,7 @@ import org.apache.kafka.server.log.remote.quota.RLMQuotaManagerConfig.INACTIVE_S
 import org.apache.kafka.server.log.remote.quota.RLMQuotaMetrics
 import kafka.server.QuotaFactory.{QuotaManagers, UNBOUNDED_QUOTA}
 import kafka.server.epoch.util.MockBlockingSender
+import kafka.server.metadata.KRaftMetadataCache
 import kafka.server.share.DelayedShareFetch
 import kafka.utils.TestUtils.waitUntilTrue
 import kafka.utils.{Pool, TestUtils}
@@ -251,7 +252,7 @@ class ReplicaManagerTest {
     }
   }
 
-  private def mockGetAliveBrokerFunctions(cache: MetadataCache, aliveBrokers: Seq[Node]): Unit = {
+  private def mockGetAliveBrokerFunctions(cache: KRaftMetadataCache, aliveBrokers: Seq[Node]): Unit = {
     when(cache.hasAliveBroker(anyInt)).thenAnswer(new Answer[Boolean]() {
       override def answer(invocation: InvocationOnMock): Boolean = {
         aliveBrokers.map(_.id()).contains(invocation.getArgument(0).asInstanceOf[Int])
@@ -264,6 +265,7 @@ class ReplicaManagerTest {
         }
       })
     when(cache.getAliveBrokerNodes(any[ListenerName])).thenReturn(aliveBrokers)
+    when(cache.getAliveBrokerEpoch(anyInt)).thenReturn(Some(1L))
   }
 
   @Test
@@ -274,7 +276,8 @@ class ReplicaManagerTest {
     props.put("log.dirs", dir1.getAbsolutePath + "," + dir2.getAbsolutePath)
     val config = KafkaConfig.fromProps(props)
     val logManager = TestUtils.createLogManager(config.logDirs.map(new File(_)), new LogConfig(new Properties()))
-    val metadataCache: MetadataCache = mock(classOf[MetadataCache])
+    val metadataCache: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
+    when(metadataCache.topicConfig(anyString())).thenReturn(new Properties())
     mockGetAliveBrokerFunctions(metadataCache, Seq(new Node(0, "host0", 0)))
     when(metadataCache.metadataVersion()).thenReturn(MetadataVersion.MINIMUM_VERSION)
     val rm = new ReplicaManager(
@@ -336,7 +339,8 @@ class ReplicaManagerTest {
     val config = KafkaConfig.fromProps(props)
     val logManager = TestUtils.createLogManager(config.logDirs.map(new File(_)), new LogConfig(new Properties()))
     val spyLogManager = spy(logManager)
-    val metadataCache: MetadataCache = mock(classOf[MetadataCache])
+    val metadataCache: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
+    when(metadataCache.topicConfig(anyString())).thenReturn(new Properties())
     mockGetAliveBrokerFunctions(metadataCache, Seq(new Node(0, "host0", 0)))
     when(metadataCache.metadataVersion()).thenReturn(MetadataVersion.MINIMUM_VERSION)
     val tp0 = new TopicPartition(topic, 0)
@@ -409,7 +413,8 @@ class ReplicaManagerTest {
     val logProps = new Properties()
     val mockLogMgr = TestUtils.createLogManager(config.logDirs.map(new File(_)), new LogConfig(logProps))
     val aliveBrokers = Seq(new Node(0, "host0", 0), new Node(1, "host1", 1))
-    val metadataCache: MetadataCache = mock(classOf[MetadataCache])
+    val metadataCache: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
+    when(metadataCache.topicConfig(anyString())).thenReturn(new Properties())
     mockGetAliveBrokerFunctions(metadataCache, aliveBrokers)
     when(metadataCache.metadataVersion()).thenReturn(MetadataVersion.MINIMUM_VERSION)
     val rm = new ReplicaManager(
@@ -2838,7 +2843,8 @@ class ReplicaManagerTest {
     val aliveBrokerIds = Seq[Integer](followerBrokerId, leaderBrokerId)
     val aliveBrokers = aliveBrokerIds.map(brokerId => new Node(brokerId, s"host$brokerId", brokerId))
 
-    val metadataCache: MetadataCache = mock(classOf[MetadataCache])
+    val metadataCache: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
+    when(metadataCache.topicConfig(anyString())).thenReturn(new Properties())
     mockGetAliveBrokerFunctions(metadataCache, aliveBrokers)
     when(metadataCache.getPartitionReplicaEndpoints(
       any[TopicPartition], any[ListenerName])).
@@ -3199,7 +3205,8 @@ class ReplicaManagerTest {
                                                                      config: KafkaConfig = config,
                                                                      scheduler: Scheduler = new MockScheduler(time)): ReplicaManager = {
     val mockLogMgr = TestUtils.createLogManager(config.logDirs.map(new File(_)))
-    val metadataCache = mock(classOf[MetadataCache])
+    val metadataCache = mock(classOf[KRaftMetadataCache])
+    when(metadataCache.topicConfig(anyString())).thenReturn(new Properties())
 
     val replicaManager = new ReplicaManager(
       metrics = metrics,
@@ -3270,7 +3277,8 @@ class ReplicaManagerTest {
     val aliveBrokers = aliveBrokerIds.map(brokerId => new Node(brokerId, s"host$brokerId", brokerId))
     brokerTopicStats = new BrokerTopicStats(KafkaConfig.fromProps(props).remoteLogManagerConfig.isRemoteStorageSystemEnabled)
 
-    val metadataCache: MetadataCache = mock(classOf[MetadataCache])
+    val metadataCache: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
+    when(metadataCache.topicConfig(anyString())).thenReturn(new Properties())
     when(metadataCache.topicIdInfo()).thenReturn((topicIds.asJava, topicNames.asJava))
     when(metadataCache.topicNamesToIds()).thenReturn(topicIds.asJava)
     when(metadataCache.topicIdsToNames()).thenReturn(topicNames.asJava)
@@ -3604,8 +3612,10 @@ class ReplicaManagerTest {
     val mockLogMgr0 = TestUtils.createLogManager(config0.logDirs.map(new File(_)))
     val mockLogMgr1 = TestUtils.createLogManager(config1.logDirs.map(new File(_)))
 
-    val metadataCache0: MetadataCache = mock(classOf[MetadataCache])
-    val metadataCache1: MetadataCache = mock(classOf[MetadataCache])
+    val metadataCache0: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
+    val metadataCache1: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
+    when(metadataCache0.topicConfig(anyString())).thenReturn(new Properties())
+    when(metadataCache1.topicConfig(anyString())).thenReturn(new Properties())
     val aliveBrokers = Seq(new Node(0, "host0", 0), new Node(1, "host1", 1))
     mockGetAliveBrokerFunctions(metadataCache0, aliveBrokers)
     mockGetAliveBrokerFunctions(metadataCache1, aliveBrokers)
