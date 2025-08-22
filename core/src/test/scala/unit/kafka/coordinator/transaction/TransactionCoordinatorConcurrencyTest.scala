@@ -16,14 +16,12 @@
  */
 package kafka.coordinator.transaction
 
-import java.nio.ByteBuffer
-import java.util.Collections
-import java.util.concurrent.atomic.AtomicBoolean
 import kafka.coordinator.AbstractCoordinatorConcurrencyTest
 import kafka.coordinator.AbstractCoordinatorConcurrencyTest._
 import kafka.coordinator.transaction.TransactionCoordinatorConcurrencyTest._
 import kafka.log.UnifiedLog
-import kafka.server.{KafkaConfig, MetadataCache}
+import kafka.server.KafkaConfig
+import kafka.server.metadata.KRaftMetadataCache
 import kafka.utils.{Pool, TestUtils}
 import org.apache.kafka.clients.{ClientResponse, NetworkClient}
 import org.apache.kafka.common.compress.Compression
@@ -41,12 +39,15 @@ import org.apache.kafka.server.storage.log.FetchIsolation
 import org.apache.kafka.storage.internals.log.{FetchDataInfo, LogConfig, LogOffsetMetadata}
 import org.junit.jupiter.api.Assertions._
 import org.junit.jupiter.api.{AfterEach, BeforeEach, Test}
-import org.mockito.{ArgumentCaptor, ArgumentMatchers}
 import org.mockito.ArgumentMatchers.{any, anyInt, anyString}
 import org.mockito.Mockito.{mock, when}
+import org.mockito.{ArgumentCaptor, ArgumentMatchers}
 
-import scala.jdk.CollectionConverters._
+import java.nio.ByteBuffer
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.collection.{Map, mutable}
+import scala.jdk.CollectionConverters._
 
 class TransactionCoordinatorConcurrencyTest extends AbstractCoordinatorConcurrencyTest[Transaction] {
   private val nTransactions = nThreads * 10
@@ -75,7 +76,7 @@ class TransactionCoordinatorConcurrencyTest extends AbstractCoordinatorConcurren
     super.setUp()
 
     val brokerNode = new Node(0, "host", 10)
-    val metadataCache: MetadataCache = mock(classOf[MetadataCache])
+    val metadataCache: KRaftMetadataCache = mock(classOf[KRaftMetadataCache])
     when(metadataCache.getPartitionLeaderEndpoint(
       anyString,
       anyInt,
@@ -92,7 +93,7 @@ class TransactionCoordinatorConcurrencyTest extends AbstractCoordinatorConcurren
 
     when(metadataCache.metadataVersion())
       .thenReturn(MetadataVersion.latestProduction())
-    
+
     txnStateManager = new TransactionStateManager(0, scheduler, replicaManager, metadataCache, txnConfig, time,
       new Metrics())
     txnStateManager.startup(() => numPartitions, enableTransactionalIdExpiration = true)

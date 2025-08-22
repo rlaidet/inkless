@@ -17,15 +17,11 @@
 
 package kafka.coordinator
 
-import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
-import java.util.{Collections, Random}
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.locks.Lock
-import kafka.coordinator.AbstractCoordinatorConcurrencyTest._
 import kafka.cluster.Partition
+import kafka.coordinator.AbstractCoordinatorConcurrencyTest._
 import kafka.log.{LogManager, UnifiedLog}
 import kafka.server.QuotaFactory.QuotaManagers
-import kafka.server.{KafkaConfig, _}
+import kafka.server._
 import kafka.utils._
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.protocol.Errors
@@ -41,6 +37,10 @@ import org.apache.kafka.storage.internals.log.{AppendOrigin, LogConfig, Verifica
 import org.junit.jupiter.api.{AfterEach, BeforeEach}
 import org.mockito.Mockito.{mock, when, withSettings}
 
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.locks.Lock
+import java.util.concurrent.{ConcurrentHashMap, ExecutorService, Executors}
+import java.util.{Collections, Random}
 import scala.collection._
 import scala.jdk.CollectionConverters._
 
