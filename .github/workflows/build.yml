@@ -100,7 +100,10 @@ jobs:
       - name: Setup Gradle
         uses: ./.github/actions/setup-gradle
         with:
-          java-version: 23
+          # Inkless: Downgrading to 17 as jooq classes are generated (or cached) with this-escape
+          # and can't find how to overcome this issue. Leaving it at JDK17 for the checks,
+          # as both JDKs 17 and 23 are tested in the next phase
+          java-version: 17
           gradle-cache-read-only: ${{ !inputs.is-trunk }}
           gradle-cache-write-only: ${{ inputs.is-trunk }}
           develocity-access-key: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
@@ -179,15 +182,12 @@ jobs:
         with:
           name: combined-test-catalog
 
-      - name: JUnit Quarantined Tests
-        id: junit-quarantined-test
-        uses: ./.github/actions/run-gradle
-        with:
-          test-task: quarantinedTest
-          timeout-minutes: 180
-          test-catalog-path: ${{ steps.load-test-catalog.outputs.download-path }}/combined-test-catalog.txt
-          build-scan-artifact-name: build-scan-quarantined-test-${{ matrix.java }}
-
+      # JOOQ classes are generated on the previous validate job,
+      # but if generated with JDK 17, there are no warning suppressions for `this-escape` needed after JDK 21.
+      # see https://github.com/jOOQ/jOOQ/issues/15619
+      - name: Regenerate JOOQ classes (needed after JDK 21)
+        if: matrix.java != '17'
+        run: ./gradlew :storage:inkless:generateJooqClasses
       - name: JUnit Tests
         id: junit-test
         uses: ./.github/actions/run-gradle
