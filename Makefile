@@ -1,7 +1,7 @@
 .PHONY: all
 all: clean fmt test pitest build_release
 
-VERSION := 4.1.0-inkless-SNAPSHOT
+VERSION := 4.1.0-inkless-58b8a3a
 
 .PHONY: build
 build:

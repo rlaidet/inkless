@@ -22,7 +22,7 @@ FROM eclipse-temurin:21-jre-alpine AS build-jsa
 
 USER root
 
-ENV KAFKA_VERSION=4.1.0-inkless-SNAPSHOT
+ENV KAFKA_VERSION=4.1.0-inkless-58b8a3a
 
 COPY ./resources/distributions/kafka_2.13-$KAFKA_VERSION.tgz /kafka.tgz
 COPY jsa_launch /etc/kafka/docker/jsa_launch
@@ -47,7 +47,7 @@ USER root
 
 ARG build_date
 
-ENV KAFKA_VERSION=4.1.0-inkless-SNAPSHOT
+ENV KAFKA_VERSION=4.1.0-inkless-58b8a3a
 
 COPY ./resources/distributions/kafka_2.13-$KAFKA_VERSION.tgz /kafka.tgz
 
