@@ -59,6 +59,7 @@ jmh-benchmarks/src/main/generated
 storage/kafka-tiered-storage/
 
 docker/test/report_*.html
+docker/.venv/
 kafka.Kafka
 __pycache__
 
