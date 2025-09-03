@@ -64,3 +64,4 @@ kafka.Kafka
 __pycache__
 
 _data/
+.venv/
